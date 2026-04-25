@@ -1,0 +1,247 @@
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { FileTracker } from './fileTracker';
+import {
+  buildRefactorPrompt,
+  DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+  PROMPT_TEMPLATE_VARIABLES,
+} from './promptBuilder';
+import { getWebviewContent } from './webview';
+
+export class SidebarProvider implements vscode.WebviewViewProvider {
+  private view?: vscode.WebviewView;
+  private refreshDebounce?: ReturnType<typeof setTimeout>;
+  private statePushId = 0;
+  private buildInFlight?: Promise<{
+    files: any[];
+    ignoredFiles: any[];
+    configs: any[];
+    promptTemplate: string;
+    promptVariables: string[];
+    defaultPromptTemplate: string;
+  }>;
+
+  constructor(private readonly tracker: FileTracker) {}
+
+  resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ) {
+   // console.log("Sidebar view resolved (src)");
+    this.view = webviewView;
+
+    webviewView.webview.options = {
+      enableScripts: true,
+      // No localResourceRoots needed — all content is inlined
+    };
+
+    // Render immediately so the panel never stays blank while we scan.
+    this.render();
+    this.bindMessages(webviewView.webview);
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  refresh() {
+    if (!this.view) { return; }
+    // Debounce rapid refreshes (e.g. on fast typing)
+    if (this.refreshDebounce) { clearTimeout(this.refreshDebounce); }
+    this.refreshDebounce = setTimeout(() => this.pushState(), 150);
+  }
+
+  // ── Internal ──────────────────────────────────────────────────────────────
+
+  private async render() {
+    if (!this.view) {
+      console.log("Cancelled");
+       return; 
+    }
+
+    // Avoid stale Activity Bar badges while a new scan is in flight.
+    this.updateBadge(0);
+
+    const script = fs.readFileSync(path.join(__dirname, 'webview-script.js'), 'utf-8');
+    this.view.webview.html = getWebviewContent({
+      files: [],
+      ignoredFiles: this.tracker.getIgnoredFiles(),
+      configs: this.tracker.getConfigs(),
+      isLoading: true,
+      promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+      promptVariables: PROMPT_TEMPLATE_VARIABLES,
+      defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+    }, script);
+    console.log("Webview html set to...");
+    console.log(this.view.webview.html);
+    console.log("Webview coontent type: " + typeof this.view.webview.html);
+    // Kick off the initial state push in the background.
+    void this.pushState();
+  }
+
+  private async pushState(forceRebuild = false) {
+    if (!this.view) { return; }
+    const pushId = ++this.statePushId;
+
+    if (forceRebuild) {
+      this.buildInFlight = undefined;
+    }
+
+    try {
+      const state = await this.buildState();
+      if (!this.view || pushId !== this.statePushId) { return; }
+      this.updateBadge(state.files.length);
+      this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false } });
+    } catch (err) {
+      if (!this.view || pushId !== this.statePushId) { return; }
+      console.error('Refactor Radar: failed to build state', err);
+      // Keep the webview usable even if state build fails.
+      this.updateBadge(0);
+      this.view.webview.postMessage({
+        type: 'updateState',
+        state: {
+          files: [],
+          ignoredFiles: this.tracker.getIgnoredFiles(),
+          configs: this.tracker.getConfigs(),
+          isLoading: false,
+          promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+          promptVariables: PROMPT_TEMPLATE_VARIABLES,
+          defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+        },
+      });
+    }
+  }
+
+  private updateBadge(alertCount: number) {
+    if (!this.view) { return; }
+    const normalizedCount = Number.isFinite(alertCount) && alertCount > 0
+      ? Math.floor(alertCount)
+      : 0;
+
+    if (normalizedCount === 0) {
+      // Some VS Code builds can keep showing a stale badge when clearing directly.
+      // Toggling through zero first reliably removes it.
+      if (this.view.badge) {
+        this.view.badge = { value: 0, tooltip: 'No refactor alerts' };
+      }
+      this.view.badge = undefined;
+      return;
+    }
+
+    this.view.badge = {
+      value: normalizedCount,
+      tooltip: `${normalizedCount} refactor alert${normalizedCount === 1 ? '' : 's'}`,
+    };
+  }
+
+  private async buildState() {
+    // Coalesce concurrent refreshes into a single scan.
+    if (!this.buildInFlight) {
+      this.buildInFlight = (async () => {
+        console.log("Building state...");
+        const [files, configs] = await Promise.all([
+          this.tracker.getOverThresholdFiles(),
+          Promise.resolve(this.tracker.getConfigs()),
+        ]);
+        return {
+          files,
+          ignoredFiles: this.tracker.getIgnoredFiles(),
+          configs,
+          isLoading: false,
+          promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+          promptVariables: PROMPT_TEMPLATE_VARIABLES,
+          defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
+        };
+      })().finally(() => {
+        this.buildInFlight = undefined;
+      });
+    }
+    return this.buildInFlight;
+  }
+
+  private bindMessages(webview: vscode.Webview) {
+    webview.onDidReceiveMessage(async (msg) => {
+      switch (msg.type) {
+
+        case 'openFile': {
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(msg.filePath));
+          await vscode.window.showTextDocument(doc);
+          break;
+        }
+
+        case 'copyPrompt': {
+          console.log(msg.filePath);
+          const doc = await this.tracker.getDocumentByPath(msg.filePath);
+          if (!doc) {
+            vscode.window.showErrorMessage(`Document not found for ${msg.filePath}`);
+            break;
+          }
+          const files = await this.tracker.getOverThresholdFiles();
+          const file = files.find(f => f.filePath === msg.filePath);
+          if (!file) { break; }
+
+          const prompt = buildRefactorPrompt(file, doc.getText(), this.tracker.getPromptTemplate());
+          await vscode.env.clipboard.writeText(prompt);
+          vscode.window.showInformationMessage(
+            `AI agent refactor prompt copied!`
+          );
+          break;
+        }
+
+        case 'savePromptTemplate': {
+          this.tracker.setPromptTemplate(String(msg.template || ''));
+          await this.pushState(true);
+          break;
+        }
+
+        case 'resetPromptTemplate': {
+          this.tracker.resetPromptTemplate();
+          await this.pushState(true);
+          break;
+        }
+
+        case 'ignoreForLines': {
+          await this.tracker.ignoreForLines(msg.filePath, msg.lineCount, msg.extra);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'ignoreForever': {
+          await this.tracker.ignoreForever(msg.filePath);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'removeLineBonus': {
+          this.tracker.removeLineBonus(msg.filePath);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'cancelPermanentIgnore': {
+          this.tracker.cancelPermanentIgnore(msg.filePath);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'updateThreshold': {
+          this.tracker.updateThreshold(msg.languageId, msg.lines);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'addCustom': {
+          this.tracker.addCustomConfig(msg.extension, msg.lines);
+          await this.pushState(true);
+          break;
+        }
+
+        case 'removeCustom': {
+          this.tracker.removeCustomConfig(msg.languageId);
+          await this.pushState(true);
+          break;
+        }
+      }
+    });
+  }
+}
