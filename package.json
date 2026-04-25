@@ -1,0 +1,89 @@
+{
+  "name": "refactor-radar",
+  "displayName": "Refactor Radar",
+  "description": "Track file lengths, get warned when they bloat, and copy AI refactor prompts in one click.",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "refactor",
+    "ai",
+    "code quality",
+    "file length",
+    "maintainability"
+  ],
+  "activationEvents": [
+    "onView:refactorRadar.panel",
+    "onCommand:refactorRadar.refresh",
+    "onCommand:refactorRadar.copyPromptForFile"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "refactorRadar",
+          "title": "Refactor Radar",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "refactorRadar": [
+        {
+          "type": "webview",
+          "id": "refactorRadar.panel",
+          "icon": "media/icon.svg",
+          "name": "Home"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "refactorRadar.refresh",
+        "title": "Refactor Radar: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "refactorRadar.copyPromptForFile",
+        "title": "Refactor Radar: Copy AI Prompt for Current File"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "refactorRadar.refresh",
+          "when": "view == refactorRadar.panel",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Refactor Radar",
+      "properties": {
+        "refactorRadar.defaultThreshold": {
+          "type": "number",
+          "default": 300,
+          "description": "Default line threshold for file types not explicitly configured."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npm run compile:webview",
+    "compile:webview": "tsc -p tsconfig.webview.json",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "@types/vscode": "^1.116.0",
+    "typescript": "^5.9.3"
+  }
+}
