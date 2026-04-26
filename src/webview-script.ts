@@ -49,6 +49,10 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     kind: 'lines' | 'forever';
     untilLines?: number;
     bonusLines?: number;
+    // Add cached fields for instant restore
+    cachedLineCount?: number;
+    cachedThreshold?: number;
+    cachedOverage?: number;
   }
 
   interface Msg {
@@ -115,11 +119,71 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
   const actions = {
     openFile: (filePath: string) => emit({ type: 'openFile', filePath }),
-    ignoreForLines: (filePath: string, lineCount: number) => emit({ type: 'ignoreForLines', filePath, lineCount, extra: 200 }),
-    ignoreForever: (filePath: string) => emit({ type: 'ignoreForever', filePath }),
-    removeLineBonus: (filePath: string) => emit({ type: 'removeLineBonus', filePath }),
-    cancelPermanentIgnore: (filePath: string) => emit({ type: 'cancelPermanentIgnore', filePath }),
-    copyPrompt: (filePath: string) => emit({ type: 'copyPrompt', filePath }),
+    ignoreForLines: (filePath: string, lineCount: number) => {
+      const file = state.files.find(f => f.filePath === filePath);
+      if (file) {
+        state.files = state.files.filter(f => f.filePath !== filePath);
+        state.ignoredFiles = [...state.ignoredFiles, {
+          filePath,
+          fileName: file.fileName,
+          kind: 'lines',
+          untilLines: lineCount + 200,
+          bonusLines: 200,
+          cachedLineCount: file.lineCount,
+          cachedThreshold: file.threshold,
+          cachedOverage: file.overage
+        }];
+        renderRoot();
+      }
+      emit({ type: 'ignoreForLines', filePath, lineCount, extra: 200 });
+    },
+    ignoreForever: (filePath: string) => {
+      const file = state.files.find(f => f.filePath === filePath);
+      if (file) {
+        state.files = state.files.filter(f => f.filePath !== filePath);
+        state.ignoredFiles = [...state.ignoredFiles, {
+          filePath,
+          fileName: file.fileName,
+          kind: 'forever',
+          cachedLineCount: file.lineCount,
+          cachedThreshold: file.threshold,
+          cachedOverage: file.overage
+        }];
+        renderRoot();
+      }
+      emit({ type: 'ignoreForever', filePath });
+    },
+    removeLineBonus: (filePath: string) => {
+      const ignoredFile = state.ignoredFiles.find(f => f.filePath === filePath);
+      if (ignoredFile && ignoredFile.cachedLineCount !== undefined && ignoredFile.cachedThreshold !== undefined) {
+        state.files = [...state.files, {
+          filePath: ignoredFile.filePath,
+          fileName: ignoredFile.fileName,
+          lineCount: ignoredFile.cachedLineCount,
+          threshold: ignoredFile.cachedThreshold,
+          overage: ignoredFile.cachedOverage || 0
+        }];
+      }
+      state.ignoredFiles = state.ignoredFiles.filter(f => f.filePath !== filePath);
+      renderRoot();
+      emit({ type: 'removeLineBonus', filePath });
+    },
+    cancelPermanentIgnore: (filePath: string) => {
+      const ignoredFile = state.ignoredFiles.find(f => f.filePath === filePath);
+      if (ignoredFile && ignoredFile.cachedLineCount !== undefined && ignoredFile.cachedThreshold !== undefined) {
+        state.files = [...state.files, {
+          filePath: ignoredFile.filePath,
+          fileName: ignoredFile.fileName,
+          lineCount: ignoredFile.cachedLineCount,
+          threshold: ignoredFile.cachedThreshold,
+          overage: ignoredFile.cachedOverage || 0
+        }];
+      }
+      state.ignoredFiles = state.ignoredFiles.filter(f => f.filePath !== filePath);
+      renderRoot();
+      emit({ type: 'cancelPermanentIgnore', filePath });
+    },
+    copyPrompt: (filePath: string, fileData: TrackedFile) => emit({ type: 'copyPrompt', filePath, fileData }),
     updateThreshold: (languageId: string, value: string) => {
       const lines = parseInt(value, 10);
       if (!isNaN(lines) && lines > 0) emit({ type: 'updateThreshold', languageId, lines });
@@ -478,9 +542,23 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       case 'openFile':
         actions.openFile(decodeFilePath(actionEl.dataset.file));
         break;
-      case 'copyPrompt':
-        actions.copyPrompt(decodeFilePath(actionEl.dataset.file));
+      case 'copyPrompt': {
+        const filePath = decodeFilePath(actionEl.dataset.file);
+        const file = state.files.find(f => f.filePath === filePath);
+        if (file) {
+          actions.copyPrompt(filePath, file);
+        }
+        const originalText = actionEl.textContent;
+        actionEl.textContent = 'Copied!';
+        actionEl.classList.add('copied');
+        setTimeout(() => {
+          if (document.body.contains(actionEl)) {
+            actionEl.textContent = originalText;
+            actionEl.classList.remove('copied');
+          }
+        }, 2000);
         break;
+      }
       case 'ignoreForLines':
         actions.ignoreForLines(
           decodeFilePath(actionEl.dataset.file),

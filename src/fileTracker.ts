@@ -178,13 +178,17 @@ export class FileTracker {
 
   // ── Threshold resolution ──────────────────────────────────────────────────
 
-  getThreshold(document: vscode.TextDocument): number {
+  getThreshold(languageIdOrDoc: string | vscode.TextDocument, fileName?: string): number {
+    const isDoc = typeof languageIdOrDoc !== 'string';
+    const langId = isDoc ? (languageIdOrDoc as vscode.TextDocument).languageId : (languageIdOrDoc as string);
+    const name = isDoc ? (languageIdOrDoc as vscode.TextDocument).fileName : (fileName || '');
+
     // 1. Match by languageId
-    const byLang = this.configs.find(c => c.languageId === document.languageId);
+    const byLang = this.configs.find(c => c.languageId === langId);
     if (byLang) { return byLang.lines; }
 
     // 2. Match by file extension (for custom types)
-    const ext = path.extname(document.fileName).toLowerCase();
+    const ext = path.extname(name).toLowerCase();
     const byExt = this.configs.find(c => c.extension === ext);
     if (byExt) { return byExt.lines; }
 
@@ -285,10 +289,10 @@ export class FileTracker {
     }
   }
 
-  private async resolveIgnoreEntry(doc: vscode.TextDocument): Promise<IgnoreEntry | undefined> {
-    const normalizedPath = this.normalizeFilePath(doc.fileName);
+  private async resolveIgnoreEntry(fileName: string): Promise<IgnoreEntry | undefined> {
+    const normalizedPath = this.normalizeFilePath(fileName);
     const directEntry = this.ignoreMap.get(normalizedPath);
-    const fileIdentity = await this.getFileIdentityFromPath(doc.fileName);
+    const fileIdentity = await this.getFileIdentityFromPath(fileName);
 
     if (directEntry) {
       let changed = false;
@@ -296,8 +300,8 @@ export class FileTracker {
         directEntry.fileIdentity = fileIdentity;
         changed = true;
       }
-      if (directEntry.originalFilePath !== doc.fileName) {
-        directEntry.originalFilePath = doc.fileName;
+      if (directEntry.originalFilePath !== fileName) {
+        directEntry.originalFilePath = fileName;
         changed = true;
       }
       if (changed) {
@@ -315,7 +319,7 @@ export class FileTracker {
       this.ignoreMap.delete(savedPath);
       this.ignoreMap.set(normalizedPath, {
         ...entry,
-        originalFilePath: doc.fileName,
+        originalFilePath: fileName,
         fileIdentity,
       });
       this.saveIgnoredFiles();
@@ -326,6 +330,8 @@ export class FileTracker {
   }
 
   // ── File scanning ─────────────────────────────────────────────────────────
+
+  private fileCache = new Map<string, { mtime: number, lineCount: number, languageId: string }>();
 
   async getOverThresholdFiles(): Promise<TrackedFile[]> {
     console.log('Scanning workspace...');
@@ -367,28 +373,42 @@ export class FileTracker {
     for (const uri of uniqueFiles) {
       if (skippedSchemes.has(uri.scheme)) { continue; }
 
-      let doc: vscode.TextDocument;
+      let lineCount: number;
+      let languageId: string;
+      const fileName = uri.fsPath;
+
       try {
-        doc = await vscode.workspace.openTextDocument(uri);
+        const stat = await vscode.workspace.fs.stat(uri);
+        const cacheKey = uri.toString();
+        const cached = this.fileCache.get(cacheKey);
+
+        if (cached && cached.mtime === stat.mtime) {
+          lineCount = cached.lineCount;
+          languageId = cached.languageId;
+        } else {
+          const doc = await vscode.workspace.openTextDocument(uri);
+          lineCount = doc.lineCount;
+          languageId = doc.languageId;
+          this.fileCache.set(cacheKey, { mtime: stat.mtime, lineCount, languageId });
+        }
       } catch {
         // Unreadable/binary/permission errors should not block the whole scan.
         continue;
       }
 
-      if (skippedLangs.has(doc.languageId)) { continue; }
+      if (skippedLangs.has(languageId)) { continue; }
 
-      const ignoreEntry = await this.resolveIgnoreEntry(doc);
-      const threshold = this.getThreshold(doc);
+      const ignoreEntry = await this.resolveIgnoreEntry(fileName);
+      const threshold = this.getThreshold(languageId, fileName);
       const effectiveThreshold = this.getEffectiveThreshold(ignoreEntry, threshold);
-      const lineCount = doc.lineCount;
 
       if (lineCount <= effectiveThreshold) { continue; }
       if (this.isIgnoredEntry(ignoreEntry, lineCount)) { continue; }
 
       results.push({
-        filePath: doc.fileName,
-        fileName: path.basename(doc.fileName),
-        languageId: doc.languageId,
+        filePath: fileName,
+        fileName: path.basename(fileName),
+        languageId,
         lineCount,
         threshold: effectiveThreshold,
         overage: lineCount - effectiveThreshold,

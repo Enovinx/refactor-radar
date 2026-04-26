@@ -68,6 +68,8 @@ class FileTracker {
         this.configs = [];
         this.ignoreMap = new Map();
         this.promptTemplate = '';
+        // ── File scanning ─────────────────────────────────────────────────────────
+        this.fileCache = new Map();
         this.onChange = onChange;
         this.loadConfigs();
         this.loadIgnoredFiles();
@@ -154,14 +156,17 @@ class FileTracker {
         this.onChange();
     }
     // ── Threshold resolution ──────────────────────────────────────────────────
-    getThreshold(document) {
+    getThreshold(languageIdOrDoc, fileName) {
+        const isDoc = typeof languageIdOrDoc !== 'string';
+        const langId = isDoc ? languageIdOrDoc.languageId : languageIdOrDoc;
+        const name = isDoc ? languageIdOrDoc.fileName : (fileName || '');
         // 1. Match by languageId
-        const byLang = this.configs.find(c => c.languageId === document.languageId);
+        const byLang = this.configs.find(c => c.languageId === langId);
         if (byLang) {
             return byLang.lines;
         }
         // 2. Match by file extension (for custom types)
-        const ext = path.extname(document.fileName).toLowerCase();
+        const ext = path.extname(name).toLowerCase();
         const byExt = this.configs.find(c => c.extension === ext);
         if (byExt) {
             return byExt.lines;
@@ -262,18 +267,18 @@ class FileTracker {
             return undefined;
         }
     }
-    async resolveIgnoreEntry(doc) {
-        const normalizedPath = this.normalizeFilePath(doc.fileName);
+    async resolveIgnoreEntry(fileName) {
+        const normalizedPath = this.normalizeFilePath(fileName);
         const directEntry = this.ignoreMap.get(normalizedPath);
-        const fileIdentity = await this.getFileIdentityFromPath(doc.fileName);
+        const fileIdentity = await this.getFileIdentityFromPath(fileName);
         if (directEntry) {
             let changed = false;
             if (fileIdentity && directEntry.fileIdentity !== fileIdentity) {
                 directEntry.fileIdentity = fileIdentity;
                 changed = true;
             }
-            if (directEntry.originalFilePath !== doc.fileName) {
-                directEntry.originalFilePath = doc.fileName;
+            if (directEntry.originalFilePath !== fileName) {
+                directEntry.originalFilePath = fileName;
                 changed = true;
             }
             if (changed) {
@@ -292,7 +297,7 @@ class FileTracker {
             this.ignoreMap.delete(savedPath);
             this.ignoreMap.set(normalizedPath, {
                 ...entry,
-                originalFilePath: doc.fileName,
+                originalFilePath: fileName,
                 fileIdentity,
             });
             this.saveIgnoredFiles();
@@ -300,7 +305,6 @@ class FileTracker {
         }
         return undefined;
     }
-    // ── File scanning ─────────────────────────────────────────────────────────
     async getOverThresholdFiles() {
         console.log('Scanning workspace...');
         const results = [];
@@ -337,21 +341,34 @@ class FileTracker {
             if (skippedSchemes.has(uri.scheme)) {
                 continue;
             }
-            let doc;
+            let lineCount;
+            let languageId;
+            const fileName = uri.fsPath;
             try {
-                doc = await vscode.workspace.openTextDocument(uri);
+                const stat = await vscode.workspace.fs.stat(uri);
+                const cacheKey = uri.toString();
+                const cached = this.fileCache.get(cacheKey);
+                if (cached && cached.mtime === stat.mtime) {
+                    lineCount = cached.lineCount;
+                    languageId = cached.languageId;
+                }
+                else {
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    lineCount = doc.lineCount;
+                    languageId = doc.languageId;
+                    this.fileCache.set(cacheKey, { mtime: stat.mtime, lineCount, languageId });
+                }
             }
             catch {
                 // Unreadable/binary/permission errors should not block the whole scan.
                 continue;
             }
-            if (skippedLangs.has(doc.languageId)) {
+            if (skippedLangs.has(languageId)) {
                 continue;
             }
-            const ignoreEntry = await this.resolveIgnoreEntry(doc);
-            const threshold = this.getThreshold(doc);
+            const ignoreEntry = await this.resolveIgnoreEntry(fileName);
+            const threshold = this.getThreshold(languageId, fileName);
             const effectiveThreshold = this.getEffectiveThreshold(ignoreEntry, threshold);
-            const lineCount = doc.lineCount;
             if (lineCount <= effectiveThreshold) {
                 continue;
             }
@@ -359,9 +376,9 @@ class FileTracker {
                 continue;
             }
             results.push({
-                filePath: doc.fileName,
-                fileName: path.basename(doc.fileName),
-                languageId: doc.languageId,
+                filePath: fileName,
+                fileName: path.basename(fileName),
+                languageId,
                 lineCount,
                 threshold: effectiveThreshold,
                 overage: lineCount - effectiveThreshold,
