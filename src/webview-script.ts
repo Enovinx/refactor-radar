@@ -73,7 +73,8 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
   const state2 = {
     collapsed: { files: false, settings: false },
     activeTab: 'alerts' as 'alerts' | 'configs' | 'ignored' | 'prompts',
-    ignoredSearch: ''
+    ignoredSearch: '',
+    configsSearch: ''
   };
 
   interface FocusSnapshot {
@@ -216,6 +217,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     switchTab: (tab: 'alerts' | 'configs' | 'ignored' | 'prompts') => { state2.activeTab = tab; renderRoot(); },
     toggleSection: (name: 'files' | 'settings') => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
     updateIgnoredSearch: (value: string) => { state2.ignoredSearch = value; renderRoot(); },
+    updateConfigsSearch: (value: string) => { state2.configsSearch = value; renderRoot(); },
     savePromptTemplate: () => {
       const textarea = document.getElementById('prompt-template') as HTMLTextAreaElement | null;
       if (!textarea) { return; }
@@ -402,8 +404,8 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     },
     thresholdRow: (cfg: LanguageConfig): string => {
       const { escHtml } = utils;
-      let row = '<tr><td><div class="lang-name">' + escHtml(cfg.displayName);
-      if (cfg.isCustom) row += '<span class="custom-badge">custom</span>';
+      const customClass = cfg.isCustom ? ' custom-lang' : '';
+      let row = '<tr><td><div class="lang-name' + customClass + '">' + escHtml(cfg.displayName);
       row += '</div><div class="lang-ext">' + escHtml(cfg.extension) + '</div></td>';
       row += '<td><input type="number" value="' + cfg.lines + '" min="10" max="9999" data-action="updateThreshold" data-language="' + escHtml(cfg.languageId) + '" /></td>';
       row += '<td>' + (cfg.isCustom ? '<button class="btn-danger btn-sm" data-action="removeCustom" data-language="' + escHtml(cfg.languageId) + '">X</button>' : '') + '</td></tr>';
@@ -450,6 +452,20 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           )
         : ignoredFiles;
 
+      const configsSearch = state2.configsSearch.trim().toLowerCase();
+      const filteredConfigs = configsSearch
+        ? configs.filter(cfg =>
+            cfg.displayName.toLowerCase().includes(configsSearch) ||
+            cfg.extension.toLowerCase().includes(configsSearch)
+          )
+        : configs;
+      
+      const sortedConfigs = [...filteredConfigs].sort((a, b) => {
+        if (a.isCustom && !b.isCustom) return -1;
+        if (!a.isCustom && b.isCustom) return 1;
+        return a.displayName.localeCompare(b.displayName);
+      });
+
       const nav = '<div class="nav-bar">' +
         '<button class="nav-tab ' + (activeTab === 'alerts' ? 'active' : '') + '" data-action="switchTab" data-tab="alerts">Alerts</button>' +
         '<button class="nav-tab ' + (activeTab === 'ignored' ? 'active' : '') + '" data-action="switchTab" data-tab="ignored">Ignored</button>' +
@@ -475,17 +491,18 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
         '<div class="settings-body">' +
           '<p class="settings-description">Set the maximum line count per file type.</p>' +
-          '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
-            configs.map(render.thresholdRow).join('') +
-          '</tbody></table>' +
-          '<hr class="settings-divider" />' +
-          '<div class="add-custom-label">Add custom file type</div>' +
-          '<div class="add-custom-row">' +
+          '<div class="configs-toolbar">' +
+            '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
+          '</div>' +
+          '<div class="add-custom-row" style="margin-bottom: 12px;">' +
             '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
             '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
-            '<button class="btn-primary" data-action="addCustom">Add</button>' +
+            '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
           '</div>' +
           '<p id="add-error" class="error-msg"></p>' +
+          '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
+            sortedConfigs.map(render.thresholdRow).join('') +
+          '</tbody></table>' +
         '</div>' +
       '</div>';
 
@@ -624,6 +641,8 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     if (!target) { return; }
     if (target.id === 'ignored-search') {
       actions.updateIgnoredSearch(target.value);
+    } else if (target.id === 'configs-search') {
+      actions.updateConfigsSearch(target.value);
     }
   }
 

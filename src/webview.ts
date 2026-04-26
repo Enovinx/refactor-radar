@@ -206,8 +206,9 @@ export function getWebviewContent(state: WebviewState, script: string): string {
     }
     .threshold-table tr:hover td { background: var(--vscode-list-hoverBackground); }
 
-    .lang-name { font-size: 11px; font-weight: 500; }
-    .lang-ext  { font-size: 10px; color: var(--vscode-descriptionForeground); }
+    .lang-name { font-size: 14px; font-weight: 600; }
+    .lang-name.custom-lang { color: var(--vscode-textLink-foreground); }
+    .lang-ext  { font-size: 12px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
 
     input[type="number"] {
       width: 62px;
@@ -259,14 +260,11 @@ export function getWebviewContent(state: WebviewState, script: string): string {
     .add-custom-row input[type="text"] { width: 70px; }
     .add-custom-row input[type="number"] { width: 58px; }
 
-    .custom-badge {
-      font-size: 9px;
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      margin-left: 4px;
-      vertical-align: middle;
+    .configs-toolbar {
+      margin-bottom: 12px;
+    }
+    .configs-search {
+      width: 100%;
     }
 
     .error-msg {
