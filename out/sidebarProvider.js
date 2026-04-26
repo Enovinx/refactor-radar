@@ -176,70 +176,78 @@ class SidebarProvider {
         webview.onDidReceiveMessage(async (msg) => {
             switch (msg.type) {
                 case 'openFile': {
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(msg.filePath));
-                    await vscode.window.showTextDocument(doc);
+                    void (async () => {
+                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(msg.filePath));
+                        await vscode.window.showTextDocument(doc);
+                    })();
                     break;
                 }
                 case 'copyPrompt': {
                     console.log(msg.filePath);
-                    const doc = await this.tracker.getDocumentByPath(msg.filePath);
-                    if (!doc) {
-                        vscode.window.showErrorMessage(`Document not found for ${msg.filePath}`);
-                        break;
-                    }
-                    const files = await this.tracker.getOverThresholdFiles();
-                    const file = files.find(f => f.filePath === msg.filePath);
-                    if (!file) {
-                        break;
-                    }
-                    const prompt = (0, promptBuilder_1.buildRefactorPrompt)(file, doc.getText(), this.tracker.getPromptTemplate());
-                    await vscode.env.clipboard.writeText(prompt);
-                    vscode.window.showInformationMessage(`AI agent refactor prompt copied!`);
+                    void (async () => {
+                        const doc = await this.tracker.getDocumentByPath(msg.filePath);
+                        if (!doc) {
+                            vscode.window.showErrorMessage(`Document not found for ${msg.filePath}`);
+                            return;
+                        }
+                        // Use the file data passed from frontend instead of rescanning
+                        const file = msg.fileData;
+                        if (!file) {
+                            return;
+                        }
+                        const prompt = (0, promptBuilder_1.buildRefactorPrompt)(file, doc.getText(), this.tracker.getPromptTemplate());
+                        await vscode.env.clipboard.writeText(prompt);
+                        vscode.window.showInformationMessage(`AI agent refactor prompt copied!`);
+                    })();
                     break;
                 }
                 case 'savePromptTemplate': {
                     this.tracker.setPromptTemplate(String(msg.template || ''));
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'resetPromptTemplate': {
                     this.tracker.resetPromptTemplate();
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'ignoreForLines': {
-                    await this.tracker.ignoreForLines(msg.filePath, msg.lineCount, msg.extra);
-                    await this.pushState(true);
+                    void (async () => {
+                        await this.tracker.ignoreForLines(msg.filePath, msg.lineCount, msg.extra);
+                        await this.pushState(true);
+                    })();
                     break;
                 }
                 case 'ignoreForever': {
-                    await this.tracker.ignoreForever(msg.filePath);
-                    await this.pushState(true);
+                    void (async () => {
+                        await this.tracker.ignoreForever(msg.filePath);
+                        await this.pushState(true);
+                    })();
                     break;
                 }
                 case 'removeLineBonus': {
                     this.tracker.removeLineBonus(msg.filePath);
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'cancelPermanentIgnore': {
                     this.tracker.cancelPermanentIgnore(msg.filePath);
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'updateThreshold': {
                     this.tracker.updateThreshold(msg.languageId, msg.lines);
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'addCustom': {
                     this.tracker.addCustomConfig(msg.extension, msg.lines);
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
                 case 'removeCustom': {
                     this.tracker.removeCustomConfig(msg.languageId);
-                    await this.pushState(true);
+                    void this.pushState(true);
                     break;
                 }
             }
