@@ -69,6 +69,7 @@ export class FileTracker {
   private configs: LanguageConfig[] = [];
   private ignoreMap: Map<string, IgnoreEntry> = new Map();
   private promptTemplate = '';
+  private batchPromptTemplate = '';
   private onChange: () => void;
 
   constructor(
@@ -79,6 +80,7 @@ export class FileTracker {
     this.loadConfigs();
     this.loadIgnoredFiles();
     this.loadPromptTemplate();
+    this.loadBatchPromptTemplate();
   }
 
   // ── Config persistence ────────────────────────────────────────────────────
@@ -94,6 +96,10 @@ export class FileTracker {
 
   private loadPromptTemplate() {
     this.promptTemplate = this.context.workspaceState.get<string>('promptTemplate', '');
+  }
+
+  private loadBatchPromptTemplate() {
+    this.batchPromptTemplate = this.context.workspaceState.get<string>('batchPromptTemplate', '');
   }
 
   private normalizeFilePath(filePath: string): string {
@@ -119,12 +125,20 @@ export class FileTracker {
     this.context.workspaceState.update('promptTemplate', this.promptTemplate);
   }
 
+  private saveBatchPromptTemplate() {
+    this.context.workspaceState.update('batchPromptTemplate', this.batchPromptTemplate);
+  }
+
   getConfigs(): LanguageConfig[] {
     return this.configs;
   }
 
   getPromptTemplate(): string {
     return this.promptTemplate;
+  }
+
+  getBatchPromptTemplate(): string {
+    return this.batchPromptTemplate;
   }
 
   setPromptTemplate(template: string) {
@@ -136,6 +150,18 @@ export class FileTracker {
   resetPromptTemplate() {
     this.promptTemplate = '';
     this.savePromptTemplate();
+    this.onChange();
+  }
+
+  setBatchPromptTemplate(template: string) {
+    this.batchPromptTemplate = template;
+    this.saveBatchPromptTemplate();
+    this.onChange();
+  }
+
+  resetBatchPromptTemplate() {
+    this.batchPromptTemplate = '';
+    this.saveBatchPromptTemplate();
     this.onChange();
   }
 

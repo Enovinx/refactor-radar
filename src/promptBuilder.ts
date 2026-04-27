@@ -4,12 +4,18 @@ import * as vscode from 'vscode';
 
 export const DEFAULT_REFACTOR_PROMPT_TEMPLATE =
   'Refactor this file by splitting it while leaving behaviour the same and respecting the current project organisation. Target line count for individual files: [targetlinecount], over by [linecountover]. File path: [file path].';
+export const DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE =
+  'Refactor files in folder [foldername] while preserving behaviour and existing architecture. Focus these files first:\n[allfilenames]';
 
 export const PROMPT_TEMPLATE_VARIABLES = [
   '[file content]',
   '[file path]',
   '[targetlinecount]',
   '[linecountover]',
+];
+export const BATCH_PROMPT_TEMPLATE_VARIABLES = [
+  '[foldername]',
+  '[allfilenames]',
 ];
 
 function applyTemplate(template: string, replacements: Record<string, string>): string {
@@ -18,6 +24,8 @@ function applyTemplate(template: string, replacements: Record<string, string>): 
     '[file path]': ['[file path]', '[filepath]'],
     '[targetlinecount]': ['[targetlinecount]'],
     '[linecountover]': ['[linecountover]'],
+    '[foldername]': ['[foldername]'],
+    '[allfilenames]': ['[allfilenames]'],
   };
 
   let output = template;
@@ -55,5 +63,24 @@ export function buildRefactorPrompt(file: TrackedFile, code: string, template?: 
     '[file path]': toWorkspaceRelativePath(file.filePath),
     '[targetlinecount]': String(file.threshold),
     '[linecountover]': String(file.overage),
+  });
+}
+
+export function buildBatchRefactorPrompt(
+  folderName: string,
+  filePaths: string[],
+  template?: string
+): string {
+  const sourceTemplate = template && template.trim().length > 0
+    ? template
+    : DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE;
+
+  const normalizedFiles = filePaths
+    .map(toWorkspaceRelativePath)
+    .sort((a, b) => a.localeCompare(b));
+
+  return applyTemplate(sourceTemplate, {
+    '[foldername]': folderName,
+    '[allfilenames]': normalizedFiles.join('\n'),
   });
 }

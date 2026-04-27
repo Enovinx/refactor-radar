@@ -3,7 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FileTracker } from './fileTracker';
 import {
+  BATCH_PROMPT_TEMPLATE_VARIABLES,
   buildRefactorPrompt,
+  buildBatchRefactorPrompt,
+  DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
   DEFAULT_REFACTOR_PROMPT_TEMPLATE,
   PROMPT_TEMPLATE_VARIABLES,
 } from './promptBuilder';
@@ -19,6 +22,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     configs: any[];
     promptTemplate: string;
     promptVariables: string[];
+    batchPromptTemplate: string;
+    batchPromptVariables: string[];
+    defaultBatchPromptTemplate: string;
     defaultPromptTemplate: string;
   }>;
 
@@ -70,6 +76,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       isLoading: true,
       promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
       promptVariables: PROMPT_TEMPLATE_VARIABLES,
+      batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+      batchPromptVariables: BATCH_PROMPT_TEMPLATE_VARIABLES,
+      defaultBatchPromptTemplate: DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
       defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
     }, script);
     console.log("Webview html set to...");
@@ -106,6 +115,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           isLoading: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
+          batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+          batchPromptVariables: BATCH_PROMPT_TEMPLATE_VARIABLES,
+          defaultBatchPromptTemplate: DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
           defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
         },
       });
@@ -150,6 +162,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           isLoading: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
+          batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+          batchPromptVariables: BATCH_PROMPT_TEMPLATE_VARIABLES,
+          defaultBatchPromptTemplate: DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
           defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
         };
       })().finally(() => {
@@ -193,14 +208,47 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case 'copyBatchPrompt': {
+          void (async () => {
+            const folderName = String(msg.folderName || '').trim();
+            const filePaths = Array.isArray(msg.filePaths)
+              ? msg.filePaths.map(String).filter(Boolean)
+              : [];
+            if (!folderName || filePaths.length === 0) {
+              return;
+            }
+
+            const prompt = buildBatchRefactorPrompt(
+              folderName,
+              filePaths,
+              this.tracker.getBatchPromptTemplate()
+            );
+            await vscode.env.clipboard.writeText(prompt);
+            vscode.window.showInformationMessage('AI batch refactor prompt copied!');
+          })();
+          break;
+        }
+
         case 'savePromptTemplate': {
           this.tracker.setPromptTemplate(String(msg.template || ''));
           void this.pushState(true);
           break;
         }
 
+        case 'saveBatchPromptTemplate': {
+          this.tracker.setBatchPromptTemplate(String(msg.template || ''));
+          void this.pushState(true);
+          break;
+        }
+
         case 'resetPromptTemplate': {
           this.tracker.resetPromptTemplate();
+          void this.pushState(true);
+          break;
+        }
+
+        case 'resetBatchPromptTemplate': {
+          this.tracker.resetBatchPromptTemplate();
           void this.pushState(true);
           break;
         }
