@@ -91,7 +91,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
   const state2 = {
     collapsed: { files: false, settings: false },
     activeTab: 'alerts' as 'alerts' | 'configs' | 'prompts',
-    configsSubTab: 'home' as 'home' | 'language' | 'ignore' | 'customLanguage' | 'scan' | 'manageFolders',
+    configsSubTab: 'language' as 'language' | 'ignore' | 'scan',
     alertsSearch: '',
     alertsSort: 'overageDesc' as 'overageDesc' | 'overageAsc',
     ignoredSearch: '',
@@ -237,7 +237,11 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       emit({ type: 'addCustom', extension, lines });
     },
     switchTab: (tab: 'alerts' | 'configs' | 'prompts') => { state2.activeTab = tab; renderRoot(); },
-    switchConfigTab: (tab: 'home' | 'language' | 'ignore' | 'customLanguage' | 'scan' | 'manageFolders') => { state2.configsSubTab = tab; renderRoot(); },
+    switchConfigTab: (tab: 'language' | 'ignore' | 'scan') => { state2.configsSubTab = tab; renderRoot(); },
+    updateConfigsSection: (value: string) => {
+      state2.configsSubTab = value === 'ignore' || value === 'scan' ? value : 'language';
+      renderRoot();
+    },
     toggleSection: (name: 'files' | 'settings') => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
     updateIgnoredSearch: (value: string) => { state2.ignoredSearch = value; renderRoot(); },
     updateAlertsSearch: (value: string) => { state2.alertsSearch = value; renderRoot(); },
@@ -500,6 +504,15 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     return root;
   }
 
+  function minimizeFolderTree(root: FolderNode): FolderNode {
+    let current = root;
+    while (current.files.length === 0 && current.children.size === 1) {
+      const onlyChild = Array.from(current.children.values())[0];
+      current = onlyChild;
+    }
+    return current;
+  }
+
   const render = {
     fileCard: (file: TrackedFile): string => {
       const { escHtml } = utils;
@@ -540,7 +553,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
       return '<details class="folder-node" open>' +
         '<summary class="folder-summary">' +
-          '<span class="folder-title">📁 ' + utils.escHtml(node.name || '.') + '</span>' +
+          '<span class="folder-title">' +
+            '<span class="folder-icon" aria-hidden="true">' +
+              '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false">' +
+                '<path fill="currentColor" d="M1.5 3.5h4.1l1.1 1.5h7.8v7.5a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" opacity="0.85"></path>' +
+              '</svg>' +
+            '</span>' +
+            utils.escHtml(node.name || '.') +
+          '</span>' +
           '<span class="folder-actions">' +
             '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
           '</span>' +
@@ -631,12 +651,13 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         }
         return b.overage - a.overage;
       });
-      const folderTree = buildFolderTree(filteredFiles);
-      const rootFileMarkup = folderTree.files.map(render.fileCard).join('');
-      const folderMarkup = rootFileMarkup + Array.from(folderTree.children.values())
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(render.folderNode)
-        .join('');
+      const folderTree = minimizeFolderTree(buildFolderTree(filteredFiles));
+      const folderMarkup = folderTree.name || folderTree.path
+        ? render.folderNode(folderTree)
+        : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(render.folderNode)
+          .join('');
 
       const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
         '<span>Files Over Threshold</span>' +
@@ -656,30 +677,13 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           : folderMarkup) +
       '</div>';
 
-      const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
-        '<button class="nav-tab ' + (state2.configsSubTab === 'home' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="home">Categories</button>' +
-        '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language</button>' +
-        '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore</button>' +
-        '<button class="nav-tab ' + (state2.configsSubTab === 'scan' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="scan">Scanning</button>' +
-      '</div>';
-
-      const settingsHomeView = '<div class="settings-body">' +
-        '<p class="settings-description">Open one settings category at a time.</p>' +
-        '<div class="file-actions">' +
-          '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="language">Language thresholds</button>' +
-          '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="ignore">Ignored files</button>' +
-          '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="scan">Scan behavior</button>' +
-        '</div>' +
-      '</div>';
-
-      const customLangForm = '<div class="settings-body">' +
-        '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="language">← Back</button>' +
-        '<div class="add-custom-row" style="margin-bottom: 12px;">' +
-          '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
-          '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
-          '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
-        '</div>' +
-        '<p id="add-error" class="error-msg"></p>' +
+      const configTabs = '<div class="settings-mode">' +
+        '<label class="settings-mode-label" for="configs-section">Settings section</label>' +
+        '<select id="configs-section" class="settings-mode-select">' +
+          '<option value="language"' + (state2.configsSubTab === 'language' ? ' selected' : '') + '>Language thresholds</option>' +
+          '<option value="ignore"' + (state2.configsSubTab === 'ignore' ? ' selected' : '') + '>Ignored files</option>' +
+          '<option value="scan"' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '>Scanning</option>' +
+        '</select>' +
       '</div>';
 
       const languageView = '<div class="settings-body">' +
@@ -687,57 +691,53 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         '<div class="configs-toolbar">' +
           '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
         '</div>' +
-        '<button class="btn-secondary" style="margin-bottom: 12px; width: 100%" data-action="switchConfigTab" data-tab="customLanguage">Add custom language</button>' +
+        '<div class="add-custom-row settings-row-spaced">' +
+          '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
+          '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
+          '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
+        '</div>' +
+        '<p id="add-error" class="error-msg"></p>' +
         '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
           sortedConfigs.map(render.thresholdRow).join('') +
         '</tbody></table>' +
       '</div>';
 
       const ignoreView = '<div class="settings-body">' +
-        '<div class="ignored-toolbar" style="padding-left:0; padding-right:0;">' +
+        '<div class="ignored-toolbar ignored-toolbar-compact">' +
           '<input type="text" id="ignored-search" class="ignored-search" placeholder="Search ignored files..." value="' + utils.escHtml(state2.ignoredSearch) + '" />' +
         '</div>' +
-        '<button class="btn-secondary" style="margin: 8px 0; width: 100%" data-action="switchConfigTab" data-tab="manageFolders">Manage ignored folders</button>' +
-        '<div class="ignored-note" style="padding-left:0; padding-right:0;">Manage ignored files and line bonuses from one place.</div>' +
+        '<p class="settings-description">Manage ignored files and folders from one place.</p>' +
+        '<div class="add-custom-row settings-row-spaced">' +
+          '<input type="text" id="new-folder" class="folder-input" placeholder="folder/path" />' +
+          '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
+        '</div>' +
+        '<p id="folder-error" class="error-msg"></p>' +
+        '<div class="ignored-note ignored-note-compact">Ignored folders are relative to workspace root.</div>' +
+        (state.scanSettings.ignoredFolders.length === 0
+          ? '<div class="empty-state">No ignored folders yet.</div>'
+          : '<div>' + state.scanSettings.ignoredFolders.map(folder =>
+            '<div class="file-card"><div class="file-meta"><span class="file-name">' + utils.escHtml(folder) + '</span></div>' +
+            '<div class="file-actions"><button class="btn-primary btn-sm" data-action="removeFolder" data-folder="' + utils.escHtml(folder) + '">Remove</button></div></div>'
+          ).join('') + '</div>') +
         (filteredIgnoredFiles.length === 0
           ? '<div class="empty-state">' + (ignoredFiles.length === 0 ? 'No ignored files yet.' : 'No ignored files match your search.') + '</div>'
           : filteredIgnoredFiles.map(render.ignoredCard).join('')) +
       '</div>';
 
-      const manageFoldersView = '<div class="settings-body">' +
-        '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="ignore">← Back</button>' +
-        '<p class="settings-description">Add folders to ignore from workspace root.</p>' +
-        '<div class="add-custom-row" style="margin-bottom: 12px;">' +
-          '<input type="text" id="new-folder" placeholder="folder/path" style="flex:1" />' +
-          '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
-        '</div>' +
-        '<p id="folder-error" class="error-msg"></p>' +
-        (state.scanSettings.ignoredFolders.length === 0
-          ? '<div class="empty-state">No ignored folders yet.</div>'
-          : '<div>' + state.scanSettings.ignoredFolders.map(folder =>
-            '<div class="file-card"><div class="file-meta"><span class="file-name">' + utils.escHtml(folder) + '</span></div>' +
-            '<div class="file-actions"><button class="btn-danger btn-sm" data-action="removeFolder" data-folder="' + utils.escHtml(folder) + '">Remove</button></div></div>'
-          ).join('') + '</div>') +
-      '</div>';
-
       const scanView = '<div class="settings-body">' +
         '<p class="settings-description">Control how scanning works for large repositories.</p>' +
-        '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;">' +
+        '<label class="scan-checkbox-row">' +
           '<input type="checkbox" id="toggle-gitignore" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
           'Ignore files listed in .gitignore' +
         '</label>' +
-        '<label style="display:block; margin-bottom: 6px;">Max files to scan (blank = unlimited)</label>' +
-        '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" style="width: 100%;" />' +
-        '<button class="btn-secondary" style="margin-top: 10px; width:100%" data-action="switchConfigTab" data-tab="manageFolders">Manage ignored folders</button>' +
+        '<label class="scan-field-label">Max files to scan (blank = unlimited)</label>' +
+        '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
       '</div>';
 
       let activeConfigView = '';
-      if (state2.configsSubTab === 'home') activeConfigView = settingsHomeView;
-      else if (state2.configsSubTab === 'language') activeConfigView = languageView;
-      else if (state2.configsSubTab === 'customLanguage') activeConfigView = customLangForm;
+      if (state2.configsSubTab === 'language') activeConfigView = languageView;
       else if (state2.configsSubTab === 'ignore') activeConfigView = ignoreView;
       else if (state2.configsSubTab === 'scan') activeConfigView = scanView;
-      else if (state2.configsSubTab === 'manageFolders') activeConfigView = manageFoldersView;
 
       const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
         '<span>Settings</span>' +
@@ -873,7 +873,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         }
         break;
       case 'switchConfigTab':
-        if (actionEl.dataset.tab === 'home' || actionEl.dataset.tab === 'language' || actionEl.dataset.tab === 'ignore' || actionEl.dataset.tab === 'customLanguage' || actionEl.dataset.tab === 'scan' || actionEl.dataset.tab === 'manageFolders') {
+        if (actionEl.dataset.tab === 'language' || actionEl.dataset.tab === 'ignore' || actionEl.dataset.tab === 'scan') {
           actions.switchConfigTab(actionEl.dataset.tab);
         }
         break;
@@ -925,6 +925,10 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     }
     if (target instanceof HTMLSelectElement && target.id === 'alerts-sort') {
       actions.updateAlertsSort(target.value);
+      return;
+    }
+    if (target instanceof HTMLSelectElement && target.id === 'configs-section') {
+      actions.updateConfigsSection(target.value);
       return;
     }
     if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
