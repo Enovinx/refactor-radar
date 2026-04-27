@@ -72,7 +72,9 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
   const state2 = {
     collapsed: { files: false, settings: false },
-    activeTab: 'alerts' as 'alerts' | 'configs' | 'ignored' | 'prompts',
+    activeTab: 'alerts' as 'alerts' | 'configs' | 'prompts',
+    configsSubTab: 'language' as 'language' | 'ignore' | 'customLanguage' | 'manageFolders',
+    alertsSearch: '',
     ignoredSearch: '',
     configsSearch: ''
   };
@@ -194,6 +196,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       const extInput = document.getElementById('new-ext') as HTMLInputElement;
       const linesInput = document.getElementById('new-lines') as HTMLInputElement;
       const errEl = document.getElementById('add-error') as HTMLElement;
+      if (!extInput || !linesInput) return;
       const ext = extInput.value.trim().replace(/^\.+/, '');
       const lines = parseInt(linesInput.value, 10);
       errEl.textContent = '';
@@ -208,15 +211,16 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
       const extension = '.' + ext;
       upsertPredictedCustomConfig(extension, lines);
+      state2.configsSubTab = 'language';
       renderRoot();
 
       emit({ type: 'addCustom', extension, lines });
-      extInput.value = '';
-      linesInput.value = '';
     },
-    switchTab: (tab: 'alerts' | 'configs' | 'ignored' | 'prompts') => { state2.activeTab = tab; renderRoot(); },
+    switchTab: (tab: 'alerts' | 'configs' | 'prompts') => { state2.activeTab = tab; renderRoot(); },
+    switchConfigTab: (tab: 'language' | 'ignore' | 'customLanguage' | 'manageFolders') => { state2.configsSubTab = tab; renderRoot(); },
     toggleSection: (name: 'files' | 'settings') => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
     updateIgnoredSearch: (value: string) => { state2.ignoredSearch = value; renderRoot(); },
+    updateAlertsSearch: (value: string) => { state2.alertsSearch = value; renderRoot(); },
     updateConfigsSearch: (value: string) => { state2.configsSearch = value; renderRoot(); },
     savePromptTemplate: () => {
       const textarea = document.getElementById('prompt-template') as HTMLTextAreaElement | null;
@@ -468,10 +472,17 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
       const nav = '<div class="nav-bar">' +
         '<button class="nav-tab ' + (activeTab === 'alerts' ? 'active' : '') + '" data-action="switchTab" data-tab="alerts">Alerts</button>' +
-        '<button class="nav-tab ' + (activeTab === 'ignored' ? 'active' : '') + '" data-action="switchTab" data-tab="ignored">Ignored</button>' +
         '<button class="nav-tab ' + (activeTab === 'configs' ? 'active' : '') + '" data-action="switchTab" data-tab="configs">Configs</button>' +
         '<button class="nav-tab ' + (activeTab === 'prompts' ? 'active' : '') + '" data-action="switchTab" data-tab="prompts">Prompts</button>' +
       '</div>';
+
+      const alertsSearch = state2.alertsSearch.trim().toLowerCase();
+      const filteredFiles = alertsSearch
+        ? files.filter(file =>
+            file.fileName.toLowerCase().includes(alertsSearch) ||
+            file.filePath.toLowerCase().includes(alertsSearch)
+          )
+        : files;
 
       const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
         '<span>Files Over Threshold</span>' +
@@ -479,43 +490,76 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         '<span class="chevron ' + (collapsed.files ? 'collapsed' : '') + '">▾</span>' +
       '</div>' +
       '<div class="section-body ' + (collapsed.files ? 'collapsed' : '') + '">' +
-        (files.length === 0
-          ? '<div class="empty-state">All files are within their line thresholds.</div>'
-          : files.map(render.fileCard).join('')) +
-      '</div>';
-
-      const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
-        '<span>Line Thresholds</span>' +
-        '<span class="chevron ' + (collapsed.settings ? 'collapsed' : '') + '">▾</span>' +
-      '</div>' +
-      '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
-        '<div class="settings-body">' +
-          '<p class="settings-description">Set the maximum line count per file type.</p>' +
-          '<div class="configs-toolbar">' +
-            '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
-          '</div>' +
-          '<div class="add-custom-row" style="margin-bottom: 12px;">' +
-            '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
-            '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
-            '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
-          '</div>' +
-          '<p id="add-error" class="error-msg"></p>' +
-          '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
-            sortedConfigs.map(render.thresholdRow).join('') +
-          '</tbody></table>' +
+        '<div class="alerts-toolbar">' +
+          '<input type="text" id="alerts-search" class="alerts-search" placeholder="Search alerts..." value="' + utils.escHtml(state2.alertsSearch) + '" />' +
         '</div>' +
+        (filteredFiles.length === 0
+          ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
+          : filteredFiles.map(render.fileCard).join('')) +
       '</div>';
 
-      const alertsPanel = '<div class="panel-alerts ' + (activeTab === 'alerts' ? 'visible' : '') + '">' + filesSection + '</div>';
-      const ignoredPanel = '<div class="panel-ignored ' + (activeTab === 'ignored' ? 'visible' : '') + '">' +
-        '<div class="ignored-toolbar">' +
+      const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
+        '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language config</button>' +
+        '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore config</button>' +
+      '</div>';
+
+      const customLangForm = '<div class="settings-body">' +
+        '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="language">← Back</button>' +
+        '<div class="add-custom-row" style="margin-bottom: 12px;">' +
+          '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
+          '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
+          '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
+        '</div>' +
+        '<p id="add-error" class="error-msg"></p>' +
+      '</div>';
+
+      const languageView = '<div class="settings-body">' +
+        '<p class="settings-description">Set the maximum line count per file type.</p>' +
+        '<div class="configs-toolbar">' +
+          '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
+        '</div>' +
+        '<button class="btn-secondary" style="margin-bottom: 12px; width: 100%" data-action="switchConfigTab" data-tab="customLanguage">Add custom language</button>' +
+        '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
+          sortedConfigs.map(render.thresholdRow).join('') +
+        '</tbody></table>' +
+      '</div>';
+
+      const ignoreView = '<div class="settings-body">' +
+        '<div class="ignored-toolbar" style="padding-left:0; padding-right:0;">' +
           '<input type="text" id="ignored-search" class="ignored-search" placeholder="Search ignored files..." value="' + utils.escHtml(state2.ignoredSearch) + '" />' +
         '</div>' +
-        '<div class="ignored-note">Manage ignored files and line bonuses from one place.</div>' +
+        '<button class="btn-secondary" style="margin: 8px 0; width: 100%" data-action="switchConfigTab" data-tab="manageFolders">Manage ignored folders</button>' +
+        '<div class="ignored-note" style="padding-left:0; padding-right:0;">Manage ignored files and line bonuses from one place.</div>' +
         (filteredIgnoredFiles.length === 0
           ? '<div class="empty-state">' + (ignoredFiles.length === 0 ? 'No ignored files yet.' : 'No ignored files match your search.') + '</div>'
           : filteredIgnoredFiles.map(render.ignoredCard).join('')) +
       '</div>';
+
+      const manageFoldersView = '<div class="settings-body">' +
+        '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="ignore">← Back</button>' +
+        '<p class="settings-description">Add folders to ignore based on root. Also disable/enable git ignore.</p>' +
+        '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;"><input type="checkbox" id="toggle-gitignore" /> Enable gitignore for refactor</label>' +
+        '<div class="add-custom-row" style="margin-bottom: 12px;">' +
+          '<input type="text" id="new-folder" placeholder="folder/path" style="flex:1" />' +
+          '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
+        '</div>' +
+      '</div>';
+
+      let activeConfigView = '';
+      if (state2.configsSubTab === 'language') activeConfigView = languageView;
+      else if (state2.configsSubTab === 'customLanguage') activeConfigView = customLangForm;
+      else if (state2.configsSubTab === 'ignore') activeConfigView = ignoreView;
+      else if (state2.configsSubTab === 'manageFolders') activeConfigView = manageFoldersView;
+
+      const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
+        '<span>Configs</span>' +
+        '<span class="chevron ' + (collapsed.settings ? 'collapsed' : '') + '">▾</span>' +
+      '</div>' +
+      '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
+        configTabs + activeConfigView +
+      '</div>';
+
+      const alertsPanel = '<div class="panel-alerts ' + (activeTab === 'alerts' ? 'visible' : '') + '">' + filesSection + '</div>';
       const configsPanel = '<div class="panel-configs ' + (activeTab === 'configs' ? 'visible' : '') + '">' + settingsSection + '</div>';
       const promptVariables = (state.promptVariables || [])
         .map(v => '<button class="btn-ghost btn-sm" data-action="insertPromptVariable" data-variable="' + utils.escHtml(v) + '">' + utils.escHtml(v) + '</button>')
@@ -532,7 +576,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         '</div>' +
       '</div>';
 
-      document.getElementById('root')!.innerHTML = loadingState + '<div class="' + contentClass + '">' + nav + alertsPanel + ignoredPanel + configsPanel + promptsPanel + '</div>';
+      document.getElementById('root')!.innerHTML = loadingState + '<div class="' + contentClass + '">' + nav + alertsPanel + configsPanel + promptsPanel + '</div>';
     }
   };
 
@@ -643,6 +687,8 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       actions.updateIgnoredSearch(target.value);
     } else if (target.id === 'configs-search') {
       actions.updateConfigsSearch(target.value);
+    } else if (target.id === 'alerts-search') {
+      actions.updateAlertsSearch(target.value);
     }
   }
 
