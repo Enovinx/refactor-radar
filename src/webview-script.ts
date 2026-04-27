@@ -504,35 +504,29 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     return root;
   }
 
-  function minimizeFolderTree(root: FolderNode): FolderNode {
-    let current = root;
-    while (current.files.length === 0 && current.children.size === 1) {
-      const onlyChild = Array.from(current.children.values())[0];
-      current = onlyChild;
-    }
-    return current;
-  }
 
   const render = {
     fileCard: (file: TrackedFile): string => {
       const { escHtml } = utils;
       const encodedPath = encodeURIComponent(file.filePath);
-      return '<div class="file-card">' +
-        '<div class="file-meta">' +
-          '<span class="file-name" title="' + escHtml(file.filePath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
-        '</div>' +
-        '<div class="file-stats">' +
-          '<span>' + file.lineCount + ' lines</span>' +
-          '<span>limit: ' + file.threshold + '</span>' +
-          '<span class="overage">+' + file.overage + ' over</span>' +
-        '</div>' +
+      return '<details class="file-card alert-node">' +
+        '<summary class="alert-summary">' +
+          '<div class="file-meta">' +
+            '<span class="file-name" title="' + escHtml(file.filePath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
+          '</div>' +
+          '<div class="file-stats">' +
+            '<span>' + file.lineCount + ' lines</span>' +
+            '<span>limit: ' + file.threshold + '</span>' +
+            '<span class="overage">+' + file.overage + ' over</span>' +
+          '</div>' +
+        '</summary>' +
         '<div class="file-actions">' +
           '<button class="btn-primary" data-action="copyPrompt" data-file="' + escHtml(encodedPath) + '">Copy AI Prompt</button>' +
           '<span class="ignore-label">Ignore:</span>' +
           '<button class="btn-ghost btn-md" data-action="ignoreForLines" data-file="' + escHtml(encodedPath) + '" data-linecount="' + file.lineCount + '">+ 200</button>' +
           '<button class="btn-ghost btn-md" data-action="ignoreForever" data-file="' + escHtml(encodedPath) + '">all</button>' +
         '</div>' +
-      '</div>';
+      '</details>';
     },
     folderNode: (node: FolderNode): string => {
       const childMarkup = Array.from(node.children.values())
@@ -551,7 +545,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         }),
       ];
 
-      return '<details class="folder-node" open>' +
+      return '<details class="folder-node">' +
         '<summary class="folder-summary">' +
           '<span class="folder-title">' +
             '<span class="folder-icon" aria-hidden="true">' +
@@ -651,13 +645,11 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         }
         return b.overage - a.overage;
       });
-      const folderTree = minimizeFolderTree(buildFolderTree(filteredFiles));
-      const folderMarkup = folderTree.name || folderTree.path
-        ? render.folderNode(folderTree)
-        : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(render.folderNode)
-          .join('');
+      const folderTree = buildFolderTree(filteredFiles);
+      const folderMarkup = folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(render.folderNode)
+        .join('');
 
       const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
         '<span>Files Over Threshold</span>' +
