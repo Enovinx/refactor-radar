@@ -16,6 +16,11 @@
         files: [],
         ignoredFiles: [],
         configs: [],
+        scanSettings: {
+            ignoreGitIgnore: true,
+            maxFilesToScan: null,
+            ignoredFolders: [],
+        },
         isLoading: true,
         promptTemplate: '',
         promptVariables: [],
@@ -30,6 +35,8 @@
         configsSubTab: 'language',
         alertsSearch: '',
         alertsSort: 'overageDesc',
+        configsSubTab: 'home',
+        alertsSearch: '',
         ignoredSearch: '',
         configsSearch: ''
     };
@@ -171,6 +178,44 @@
             renderRoot();
         },
         updateConfigsSearch: (value) => { state2.configsSearch = value; renderRoot(); },
+        updateIgnoreGitIgnore: (enabled) => {
+            state.scanSettings.ignoreGitIgnore = enabled;
+            renderRoot();
+            emit({ type: 'updateIgnoreGitIgnore', enabled });
+        },
+        updateMaxFilesToScan: (value) => {
+            const parsed = parseInt(value, 10);
+            const maxFilesToScan = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+            state.scanSettings.maxFilesToScan = maxFilesToScan;
+            renderRoot();
+            emit({ type: 'updateMaxFilesToScan', maxFilesToScan });
+        },
+        addIgnoredFolder: () => {
+            const folderInput = document.getElementById('new-folder');
+            const errEl = document.getElementById('folder-error');
+            if (!folderInput || !errEl) {
+                return;
+            }
+            const folder = folderInput.value.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+            errEl.textContent = '';
+            if (!folder) {
+                errEl.textContent = 'Enter a folder path.';
+                return;
+            }
+            if (state.scanSettings.ignoredFolders.includes(folder)) {
+                errEl.textContent = 'Folder already ignored.';
+                return;
+            }
+            state.scanSettings.ignoredFolders = [...state.scanSettings.ignoredFolders, folder].sort((a, b) => a.localeCompare(b));
+            folderInput.value = '';
+            renderRoot();
+            emit({ type: 'addIgnoredFolder', folder });
+        },
+        removeIgnoredFolder: (folder) => {
+            state.scanSettings.ignoredFolders = state.scanSettings.ignoredFolders.filter(item => item !== folder);
+            renderRoot();
+            emit({ type: 'removeIgnoredFolder', folder });
+        },
         savePromptTemplate: () => {
             const textarea = document.getElementById('prompt-template');
             if (!textarea) {
@@ -509,6 +554,24 @@
             const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
                 '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language config</button>' +
                 '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore config</button>' +
+                '</div>' +
+                (filteredFiles.length === 0
+                    ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
+                    : filteredFiles.map(render.fileCard).join('')) +
+                '</div>';
+            const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'home' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="home">Categories</button>' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language</button>' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore</button>' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'scan' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="scan">Scanning</button>' +
+                '</div>';
+            const settingsHomeView = '<div class="settings-body">' +
+                '<p class="settings-description">Open one settings category at a time.</p>' +
+                '<div class="file-actions">' +
+                '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="language">Language thresholds</button>' +
+                '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="ignore">Ignored files</button>' +
+                '<button class="btn-secondary" style="width:100%" data-action="switchConfigTab" data-tab="scan">Scan behavior</button>' +
+                '</div>' +
                 '</div>';
             const customLangForm = '<div class="settings-body">' +
                 '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="language">← Back</button>' +
@@ -543,6 +606,7 @@
                 '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="ignore">← Back</button>' +
                 '<p class="settings-description">Add folders to ignore based on root. Also disable/enable git ignore.</p>' +
                 '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;"><input type="checkbox" id="toggle-gitignore" /> Enable gitignore for refactor</label>' +
+                '<p class="settings-description">Add folders to ignore from workspace root.</p>' +
                 '<div class="add-custom-row" style="margin-bottom: 12px;">' +
                 '<input type="text" id="new-folder" placeholder="folder/path" style="flex:1" />' +
                 '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
@@ -550,6 +614,26 @@
                 '</div>';
             let activeConfigView = '';
             if (state2.configsSubTab === 'language')
+                '<p id="folder-error" class="error-msg"></p>' +
+                (state.scanSettings.ignoredFolders.length === 0
+                    ? '<div class="empty-state">No ignored folders yet.</div>'
+                    : '<div>' + state.scanSettings.ignoredFolders.map(folder => '<div class="file-card"><div class="file-meta"><span class="file-name">' + utils.escHtml(folder) + '</span></div>' +
+                        '<div class="file-actions"><button class="btn-danger btn-sm" data-action="removeFolder" data-folder="' + utils.escHtml(folder) + '">Remove</button></div></div>').join('') + '</div>') +
+                '</div>';
+            const scanView = '<div class="settings-body">' +
+                '<p class="settings-description">Control how scanning works for large repositories.</p>' +
+                '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;">' +
+                '<input type="checkbox" id="toggle-gitignore" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
+                'Ignore files listed in .gitignore' +
+                '</label>' +
+                '<label style="display:block; margin-bottom: 6px;">Max files to scan (blank = unlimited)</label>' +
+                '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" style="width: 100%;" />' +
+                '<button class="btn-secondary" style="margin-top: 10px; width:100%" data-action="switchConfigTab" data-tab="manageFolders">Manage ignored folders</button>' +
+                '</div>';
+            let activeConfigView = '';
+            if (state2.configsSubTab === 'home')
+                activeConfigView = settingsHomeView;
+            else if (state2.configsSubTab === 'language')
                 activeConfigView = languageView;
             else if (state2.configsSubTab === 'customLanguage')
                 activeConfigView = customLangForm;
@@ -559,6 +643,12 @@
                 activeConfigView = manageFoldersView;
             const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
                 '<span>Configs</span>' +
+            else if (state2.configsSubTab === 'scan')
+                activeConfigView = scanView;
+            else if (state2.configsSubTab === 'manageFolders')
+                activeConfigView = manageFoldersView;
+            const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
+                '<span>Settings</span>' +
                 '<span class="chevron ' + (collapsed.settings ? 'collapsed' : '') + '">▾</span>' +
                 '</div>' +
                 '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
@@ -683,6 +773,24 @@
                     actions.toggleSection(actionEl.dataset.section);
                 }
                 break;
+            case 'switchConfigTab':
+                if (actionEl.dataset.tab === 'home' || actionEl.dataset.tab === 'language' || actionEl.dataset.tab === 'ignore' || actionEl.dataset.tab === 'customLanguage' || actionEl.dataset.tab === 'scan' || actionEl.dataset.tab === 'manageFolders') {
+                    actions.switchConfigTab(actionEl.dataset.tab);
+                }
+                break;
+            case 'addFolder':
+                actions.addIgnoredFolder();
+                break;
+            case 'removeFolder':
+                if (actionEl.dataset.folder) {
+                    actions.removeIgnoredFolder(actionEl.dataset.folder);
+                }
+                break;
+            case 'toggleGitIgnore': {
+                const checkbox = actionEl;
+                actions.updateIgnoreGitIgnore(Boolean(checkbox.checked));
+                break;
+            }
             case 'savePromptTemplate':
                 actions.savePromptTemplate();
                 break;
@@ -720,9 +828,14 @@
             return;
         }
         if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
+        if (target.dataset.action === 'updateThreshold' && target.dataset.language) {
+            actions.updateThreshold(target.dataset.language, target.value);
             return;
         }
-        actions.updateThreshold(target.dataset.language, target.value);
+        if (target.id === 'max-files-to-scan') {
+            actions.updateMaxFilesToScan(target.value);
+            return;
+        }
     }
     function onInput(e) {
         const target = e.target;
@@ -743,6 +856,9 @@
         const target = e.target;
         if (e.key === 'Enter' && (target?.id === 'new-ext' || target?.id === 'new-lines')) {
             actions.addCustom();
+        }
+        if (e.key === 'Enter' && target?.id === 'new-folder') {
+            actions.addIgnoredFolder();
         }
     }
     window.addEventListener('beforeunload', () => {

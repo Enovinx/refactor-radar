@@ -79,6 +79,7 @@ class SidebarProvider {
             files: [],
             ignoredFiles: this.tracker.getIgnoredFiles(),
             configs: this.tracker.getConfigs(),
+            scanSettings: this.tracker.getScanSettings(),
             isLoading: true,
             promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
             promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
@@ -122,6 +123,7 @@ class SidebarProvider {
                     files: [],
                     ignoredFiles: this.tracker.getIgnoredFiles(),
                     configs: this.tracker.getConfigs(),
+                    scanSettings: this.tracker.getScanSettings(),
                     isLoading: false,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
@@ -167,6 +169,7 @@ class SidebarProvider {
                     files,
                     ignoredFiles: this.tracker.getIgnoredFiles(),
                     configs,
+                    scanSettings: this.tracker.getScanSettings(),
                     isLoading: false,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
@@ -281,6 +284,27 @@ class SidebarProvider {
                 }
                 case 'removeCustom': {
                     this.tracker.removeCustomConfig(msg.languageId);
+                    void this.pushState(true);
+                    break;
+                }
+                case 'updateIgnoreGitIgnore': {
+                    this.tracker.updateIgnoreGitIgnore(Boolean(msg.enabled));
+                    void this.pushState(true);
+                    break;
+                }
+                case 'updateMaxFilesToScan': {
+                    const parsed = Number(msg.maxFilesToScan);
+                    this.tracker.updateMaxFilesToScan(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+                    void this.pushState(true);
+                    break;
+                }
+                case 'addIgnoredFolder': {
+                    this.tracker.addIgnoredFolder(String(msg.folder || ''));
+                    void this.pushState(true);
+                    break;
+                }
+                case 'removeIgnoredFolder': {
+                    this.tracker.removeIgnoredFolder(String(msg.folder || ''));
                     void this.pushState(true);
                     break;
                 }
