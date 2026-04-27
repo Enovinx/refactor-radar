@@ -500,6 +500,15 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     return root;
   }
 
+  function minimizeFolderTree(root: FolderNode): FolderNode {
+    let current = root;
+    while (current.files.length === 0 && current.children.size === 1) {
+      const onlyChild = Array.from(current.children.values())[0];
+      current = onlyChild;
+    }
+    return current;
+  }
+
   const render = {
     fileCard: (file: TrackedFile): string => {
       const { escHtml } = utils;
@@ -540,7 +549,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
       return '<details class="folder-node" open>' +
         '<summary class="folder-summary">' +
-          '<span class="folder-title">📁 ' + utils.escHtml(node.name || '.') + '</span>' +
+          '<span class="folder-title">' +
+            '<span class="folder-icon" aria-hidden="true">' +
+              '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false">' +
+                '<path fill="currentColor" d="M1.5 3.5h4.1l1.1 1.5h7.8v7.5a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" opacity="0.85"></path>' +
+              '</svg>' +
+            '</span>' +
+            utils.escHtml(node.name || '.') +
+          '</span>' +
           '<span class="folder-actions">' +
             '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
           '</span>' +
@@ -631,12 +647,13 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         }
         return b.overage - a.overage;
       });
-      const folderTree = buildFolderTree(filteredFiles);
-      const rootFileMarkup = folderTree.files.map(render.fileCard).join('');
-      const folderMarkup = rootFileMarkup + Array.from(folderTree.children.values())
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(render.folderNode)
-        .join('');
+      const folderTree = minimizeFolderTree(buildFolderTree(filteredFiles));
+      const folderMarkup = folderTree.name || folderTree.path
+        ? render.folderNode(folderTree)
+        : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(render.folderNode)
+          .join('');
 
       const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
         '<span>Files Over Threshold</span>' +
