@@ -75,6 +75,7 @@ export class FileTracker {
   private configs: LanguageConfig[] = [];
   private ignoreMap: Map<string, IgnoreEntry> = new Map();
   private promptTemplate = '';
+  private batchPromptTemplate = '';
   private scanSettings: ScanSettings = {
     ignoreGitIgnore: true,
     maxFilesToScan: null,
@@ -90,6 +91,7 @@ export class FileTracker {
     this.loadConfigs();
     this.loadIgnoredFiles();
     this.loadPromptTemplate();
+    this.loadBatchPromptTemplate();
     this.loadScanSettings();
   }
 
@@ -108,6 +110,9 @@ export class FileTracker {
     this.promptTemplate = this.context.workspaceState.get<string>('promptTemplate', '');
   }
 
+  private loadBatchPromptTemplate() {
+    this.batchPromptTemplate = this.context.workspaceState.get<string>('batchPromptTemplate', '');
+  }
   private loadScanSettings() {
     const saved = this.context.workspaceState.get<Partial<ScanSettings>>('scanSettings', {});
     this.scanSettings = {
@@ -148,6 +153,10 @@ export class FileTracker {
     this.context.workspaceState.update('promptTemplate', this.promptTemplate);
   }
 
+  private saveBatchPromptTemplate() {
+    this.context.workspaceState.update('batchPromptTemplate', this.batchPromptTemplate);
+  }
+
   getConfigs(): LanguageConfig[] {
     return this.configs;
   }
@@ -156,6 +165,9 @@ export class FileTracker {
     return this.promptTemplate;
   }
 
+  getBatchPromptTemplate(): string {
+    return this.batchPromptTemplate;
+  }
   getScanSettings(): ScanSettings {
     return this.scanSettings;
   }
@@ -169,6 +181,18 @@ export class FileTracker {
   resetPromptTemplate() {
     this.promptTemplate = '';
     this.savePromptTemplate();
+    this.onChange();
+  }
+
+  setBatchPromptTemplate(template: string) {
+    this.batchPromptTemplate = template;
+    this.saveBatchPromptTemplate();
+    this.onChange();
+  }
+
+  resetBatchPromptTemplate() {
+    this.batchPromptTemplate = '';
+    this.saveBatchPromptTemplate();
     this.onChange();
   }
 

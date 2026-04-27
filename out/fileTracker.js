@@ -68,6 +68,7 @@ class FileTracker {
         this.configs = [];
         this.ignoreMap = new Map();
         this.promptTemplate = '';
+        this.batchPromptTemplate = '';
         this.scanSettings = {
             ignoreGitIgnore: true,
             maxFilesToScan: null,
@@ -79,6 +80,7 @@ class FileTracker {
         this.loadConfigs();
         this.loadIgnoredFiles();
         this.loadPromptTemplate();
+        this.loadBatchPromptTemplate();
         this.loadScanSettings();
     }
     // ── Config persistence ────────────────────────────────────────────────────
@@ -93,6 +95,9 @@ class FileTracker {
     }
     loadPromptTemplate() {
         this.promptTemplate = this.context.workspaceState.get('promptTemplate', '');
+    }
+    loadBatchPromptTemplate() {
+        this.batchPromptTemplate = this.context.workspaceState.get('batchPromptTemplate', '');
     }
     loadScanSettings() {
         const saved = this.context.workspaceState.get('scanSettings', {});
@@ -127,11 +132,17 @@ class FileTracker {
     savePromptTemplate() {
         this.context.workspaceState.update('promptTemplate', this.promptTemplate);
     }
+    saveBatchPromptTemplate() {
+        this.context.workspaceState.update('batchPromptTemplate', this.batchPromptTemplate);
+    }
     getConfigs() {
         return this.configs;
     }
     getPromptTemplate() {
         return this.promptTemplate;
+    }
+    getBatchPromptTemplate() {
+        return this.batchPromptTemplate;
     }
     getScanSettings() {
         return this.scanSettings;
@@ -144,6 +155,16 @@ class FileTracker {
     resetPromptTemplate() {
         this.promptTemplate = '';
         this.savePromptTemplate();
+        this.onChange();
+    }
+    setBatchPromptTemplate(template) {
+        this.batchPromptTemplate = template;
+        this.saveBatchPromptTemplate();
+        this.onChange();
+    }
+    resetBatchPromptTemplate() {
+        this.batchPromptTemplate = '';
+        this.saveBatchPromptTemplate();
         this.onChange();
     }
     updateIgnoreGitIgnore(enabled) {
@@ -437,7 +458,7 @@ class FileTracker {
         // findFiles only accepts one include pattern, so scan per-extension.
         const allFiles = [];
         for (const inc of includes) {
-            const pattern = new vscode.RelativePattern(root, inc);
+            const pattern = new vscode.RelativePattern(workspaceFolders[0], inc);
             const uris = await vscode.workspace.findFiles(pattern, exclude);
             allFiles.push(...uris);
         }

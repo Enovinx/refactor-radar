@@ -83,6 +83,9 @@ class SidebarProvider {
             isLoading: true,
             promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
             promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
+            batchPromptTemplate: this.tracker.getBatchPromptTemplate() || promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+            batchPromptVariables: promptBuilder_1.BATCH_PROMPT_TEMPLATE_VARIABLES,
+            defaultBatchPromptTemplate: promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
             defaultPromptTemplate: promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
         }, script);
         console.log("Webview html set to...");
@@ -124,6 +127,9 @@ class SidebarProvider {
                     isLoading: false,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
+                    batchPromptTemplate: this.tracker.getBatchPromptTemplate() || promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+                    batchPromptVariables: promptBuilder_1.BATCH_PROMPT_TEMPLATE_VARIABLES,
+                    defaultBatchPromptTemplate: promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
                     defaultPromptTemplate: promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                 },
             });
@@ -167,6 +173,9 @@ class SidebarProvider {
                     isLoading: false,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
+                    batchPromptTemplate: this.tracker.getBatchPromptTemplate() || promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
+                    batchPromptVariables: promptBuilder_1.BATCH_PROMPT_TEMPLATE_VARIABLES,
+                    defaultBatchPromptTemplate: promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
                     defaultPromptTemplate: promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                 };
             })().finally(() => {
@@ -204,13 +213,38 @@ class SidebarProvider {
                     })();
                     break;
                 }
+                case 'copyBatchPrompt': {
+                    void (async () => {
+                        const folderName = String(msg.folderName || '').trim();
+                        const filePaths = Array.isArray(msg.filePaths)
+                            ? msg.filePaths.map(String).filter(Boolean)
+                            : [];
+                        if (!folderName || filePaths.length === 0) {
+                            return;
+                        }
+                        const prompt = (0, promptBuilder_1.buildBatchRefactorPrompt)(folderName, filePaths, this.tracker.getBatchPromptTemplate());
+                        await vscode.env.clipboard.writeText(prompt);
+                        vscode.window.showInformationMessage('AI batch refactor prompt copied!');
+                    })();
+                    break;
+                }
                 case 'savePromptTemplate': {
                     this.tracker.setPromptTemplate(String(msg.template || ''));
                     void this.pushState(true);
                     break;
                 }
+                case 'saveBatchPromptTemplate': {
+                    this.tracker.setBatchPromptTemplate(String(msg.template || ''));
+                    void this.pushState(true);
+                    break;
+                }
                 case 'resetPromptTemplate': {
                     this.tracker.resetPromptTemplate();
+                    void this.pushState(true);
+                    break;
+                }
+                case 'resetBatchPromptTemplate': {
+                    this.tracker.resetBatchPromptTemplate();
                     void this.pushState(true);
                     break;
                 }
