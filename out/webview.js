@@ -129,16 +129,12 @@ function getWebviewContent(state, script) {
       gap: 4px;
       flex-wrap: wrap;
     }
-    details.file-card .file-actions,
-    .folder-actions {
+    details.file-card .file-actions {
       display: none;
     }
     details.file-card[open] .file-actions {
       display: flex;
       padding: 0 12px 8px;
-    }
-    .folder-node[open] > .folder-summary .folder-actions {
-      display: inline-flex;
     }
 
     .file-actions .ignore-label {
@@ -295,21 +291,54 @@ function getWebviewContent(state, script) {
       margin-left: 0;
     }
     .folder-summary {
-      list-style: none;
-      cursor: pointer;
       padding: 6px 8px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
       gap: 8px;
     }
-    .folder-summary::-webkit-details-marker { display: none; }
+    .folder-toggle {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      padding: 0;
+      background: transparent;
+      color: var(--vscode-descriptionForeground);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .folder-toggle:hover {
+      background: var(--vscode-list-hoverBackground);
+      color: var(--vscode-foreground);
+    }
+    .folder-arrow {
+      font-size: 12px;
+      line-height: 1;
+    }
+    .folder-main-btn {
+      background: transparent;
+      color: inherit;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 2px 4px;
+      display: inline-flex;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+    }
+    .folder-main-btn:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
     .folder-title {
       font-size: 12px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      min-width: 0;
     }
     .folder-icon {
       color: var(--vscode-descriptionForeground);
@@ -320,7 +349,20 @@ function getWebviewContent(state, script) {
       height: 14px;
       flex-shrink: 0;
     }
-    .folder-children { margin-left: 0; }
+    .folder-count {
+      margin-left: 4px;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .folder-actions {
+      margin-left: auto;
+    }
+    .folder-children {
+      margin-left: 16px;
+      padding-left: 8px;
+      border-left: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.2));
+    }
+    .folder-children.collapsed { display: none; }
     .configs-search {
       width: 100%;
     }

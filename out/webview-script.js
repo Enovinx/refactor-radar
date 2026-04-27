@@ -36,7 +36,9 @@
         alertsSearch: '',
         alertsSort: 'overageDesc',
         ignoredSearch: '',
-        configsSearch: ''
+        configsSearch: '',
+        expandedFolders: new Set(),
+        activeFolderPrompt: null,
     };
     let loadingMessage = LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)];
     let loadingMessageTimer;
@@ -177,6 +179,25 @@
         updateAlertsSearch: (value) => { state2.alertsSearch = value; renderRoot(); },
         updateAlertsSort: (value) => {
             state2.alertsSort = value === 'overageAsc' ? 'overageAsc' : 'overageDesc';
+            renderRoot();
+        },
+        toggleFolderExpand: (folderPath) => {
+            if (!folderPath) {
+                return;
+            }
+            if (state2.expandedFolders.has(folderPath)) {
+                state2.expandedFolders.delete(folderPath);
+            }
+            else {
+                state2.expandedFolders.add(folderPath);
+            }
+            renderRoot();
+        },
+        toggleFolderPrompt: (folderPath) => {
+            if (!folderPath) {
+                return;
+            }
+            state2.activeFolderPrompt = state2.activeFolderPrompt === folderPath ? null : folderPath;
             renderRoot();
         },
         updateConfigsSearch: (value) => { state2.configsSearch = value; renderRoot(); },
@@ -384,13 +405,50 @@
     }
     function normalizeFolderSegments(filePath) {
         const normalized = filePath.replace(/\\/g, '/');
-        const parts = normalized.split('/').filter(Boolean);
+        const parts = normalized
+            .split('/')
+            .filter(Boolean)
+            .filter(segment => segment !== '.' && segment !== '..');
+        if (parts.length > 0 && /^[a-zA-Z]:$/.test(parts[0])) {
+            return parts.slice(1, Math.max(1, parts.length - 1));
+        }
         return parts.slice(0, Math.max(0, parts.length - 1));
     }
+    function getCommonPrefixLength(segmentsList) {
+        if (segmentsList.length === 0) {
+            return 0;
+        }
+        const minLength = Math.min(...segmentsList.map(segments => segments.length));
+        let prefixLength = 0;
+        for (let i = 0; i < minLength; i++) {
+            const segment = segmentsList[0][i];
+            if (segmentsList.every(segments => segments[i] === segment)) {
+                prefixLength++;
+                continue;
+            }
+            break;
+        }
+        if (prefixLength > 0 && segmentsList.every(segments => segments.length === prefixLength)) {
+            prefixLength -= 1;
+        }
+        return Math.max(0, prefixLength);
+    }
+    function getAllNodePaths(node) {
+        const nested = Array.from(node.children.values()).flatMap(getAllNodePaths);
+        return [...node.files.map(file => file.filePath), ...nested];
+    }
+    function computeAlertCounts(node) {
+        const childCount = Array.from(node.children.values()).reduce((sum, child) => sum + computeAlertCounts(child), 0);
+        node.alertCount = node.files.length + childCount;
+        return node.alertCount;
+    }
     function buildFolderTree(files) {
-        const root = { name: '', path: '', files: [], children: new Map() };
-        for (const file of files) {
-            const segments = normalizeFolderSegments(file.filePath);
+        const root = { name: '', path: '', files: [], children: new Map(), alertCount: 0 };
+        const normalizedSegments = files.map(file => normalizeFolderSegments(file.filePath));
+        const prefixLength = getCommonPrefixLength(normalizedSegments);
+        for (let index = 0; index < files.length; index++) {
+            const file = files[index];
+            const segments = normalizedSegments[index].slice(prefixLength);
             let current = root;
             let runningPath = '';
             for (const segment of segments) {
@@ -401,12 +459,14 @@
                         path: runningPath,
                         files: [],
                         children: new Map(),
+                        alertCount: 0,
                     });
                 }
                 current = current.children.get(segment);
             }
             current.files.push(file);
         }
+        computeAlertCounts(root);
         return root;
     }
     const render = {
@@ -441,29 +501,33 @@
                 .sort((a, b) => b.overage - a.overage)
                 .map(render.fileCard)
                 .join('');
-            const allPaths = [
-                ...node.files.map(file => file.filePath),
-                ...Array.from(node.children.values()).flatMap(function collectPaths(child) {
-                    const nested = Array.from(child.children.values()).flatMap(collectPaths);
-                    return [...child.files.map(file => file.filePath), ...nested];
-                }),
-            ];
-            return '<details class="folder-node">' +
-                '<summary class="folder-summary">' +
+            const allPaths = getAllNodePaths(node);
+            const isExpanded = state2.expandedFolders.has(node.path);
+            const showFolderPrompt = state2.activeFolderPrompt === node.path;
+            return '<div class="folder-node">' +
+                '<div class="folder-summary">' +
+                '<button class="folder-toggle" data-action="toggleFolderExpand" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '" aria-label="Toggle folder" aria-expanded="' + (isExpanded ? 'true' : 'false') + '">' +
+                '<span class="folder-arrow" aria-hidden="true">' + (isExpanded ? '▾' : '▸') + '</span>' +
+                '</button>' +
+                '<button class="folder-main-btn" data-action="toggleFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '">' +
                 '<span class="folder-title">' +
                 '<span class="folder-icon" aria-hidden="true">' +
                 '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false">' +
                 '<path fill="currentColor" d="M1.5 3.5h4.1l1.1 1.5h7.8v7.5a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" opacity="0.85"></path>' +
                 '</svg>' +
                 '</span>' +
-                utils.escHtml(node.name || '.') +
+                '<span>' + utils.escHtml(node.name) + '</span>' +
+                '<span class="folder-count">' + node.alertCount + '</span>' +
                 '</span>' +
+                '</button>' +
                 '<span class="folder-actions">' +
-                '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
+                (showFolderPrompt
+                    ? '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>'
+                    : '') +
                 '</span>' +
-                '</summary>' +
-                '<div class="folder-children">' + childMarkup + fileMarkup + '</div>' +
-                '</details>';
+                '</div>' +
+                '<div class="folder-children ' + (isExpanded ? '' : 'collapsed') + '">' + childMarkup + fileMarkup + '</div>' +
+                '</div>';
         },
         thresholdRow: (cfg) => {
             const { escHtml } = utils;
@@ -718,6 +782,12 @@
                 break;
             case 'copyFolderPrompt':
                 actions.copyFolderPrompt(decodeFilePath(actionEl.dataset.folder), decodeFilePathList(actionEl.dataset.files));
+                break;
+            case 'toggleFolderExpand':
+                actions.toggleFolderExpand(decodeFilePath(actionEl.dataset.folder));
+                break;
+            case 'toggleFolderPrompt':
+                actions.toggleFolderPrompt(decodeFilePath(actionEl.dataset.folder));
                 break;
             case 'removeLineBonus':
                 actions.removeLineBonus(decodeFilePath(actionEl.dataset.file));
