@@ -134,10 +134,10 @@ function getWebviewContent(state, script) {
       font-size: 11px;
       cursor: pointer;
       border: none;
-      border-radius: 3px;
-      padding: 3px 8px;
-      line-height: 1.5;
-      transition: opacity 0.1s;
+      border-radius: 4px;
+      padding: 4px 10px;
+      line-height: 1.45;
+      transition: opacity 0.1s, background-color 0.1s;
     }
     button:hover { opacity: 0.85; }
     button:active { opacity: 0.7; }
@@ -147,22 +147,22 @@ function getWebviewContent(state, script) {
       color: var(--vscode-button-foreground);
     }
     .btn-secondary {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
     }
     .btn-ghost {
-      background: transparent;
-      color: var(--vscode-descriptionForeground);
-      border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.3));
+      background: color-mix(in srgb, var(--vscode-button-background) 18%, transparent);
+      color: var(--vscode-button-foreground);
+      border: 1px solid color-mix(in srgb, var(--vscode-button-background) 60%, transparent);
     }
     .btn-danger {
-      background: transparent;
-      color: #e05050;
-      border: 1px solid rgba(204,60,60,0.35);
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: 1px solid color-mix(in srgb, var(--vscode-button-background) 75%, transparent);
     }
     .btn-sm { padding: 2px 6px; font-size: 10px; }
 
-    .settings-body { padding: 8px 12px 12px; }
+    .settings-body { padding: 8px 12px 10px; }
 
     .settings-description {
       font-size: 11px;
@@ -238,8 +238,15 @@ function getWebviewContent(state, script) {
       gap: 6px;
       align-items: center;
     }
+    .settings-row-spaced {
+      margin-bottom: 10px;
+    }
     .add-custom-row input[type="text"] { width: 70px; }
     .add-custom-row input[type="number"] { width: 58px; }
+    .folder-input {
+      flex: 1;
+      min-width: 120px;
+    }
 
     .configs-toolbar {
       margin-bottom: 12px;
@@ -294,6 +301,18 @@ function getWebviewContent(state, script) {
     .configs-search {
       width: 100%;
     }
+    .settings-mode {
+      padding: 10px 12px 0;
+      display: grid;
+      gap: 4px;
+    }
+    .settings-mode-label {
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .settings-mode-select {
+      width: 100%;
+    }
 
     .error-msg {
       font-size: 11px;
@@ -340,6 +359,11 @@ function getWebviewContent(state, script) {
 
     .ignored-search {
       width: 100%;
+    }
+    .ignored-toolbar-compact,
+    .ignored-note-compact {
+      padding-left: 0;
+      padding-right: 0;
     }
 
     .ignored-note {
@@ -390,6 +414,43 @@ function getWebviewContent(state, script) {
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
+    }
+
+    select,
+    .settings-mode-select {
+      font-family: var(--vscode-font-family);
+      font-size: 11px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, transparent);
+      border-radius: 3px;
+      padding: 3px 6px;
+    }
+    select:focus,
+    .settings-mode-select:focus {
+      outline: 1px solid var(--vscode-focusBorder);
+      border-color: var(--vscode-focusBorder);
+    }
+    .scan-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    input[type="checkbox"] {
+      accent-color: var(--vscode-button-background);
+      width: 14px;
+      height: 14px;
+    }
+    .scan-field-label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .scan-input {
+      width: 100%;
     }
 
     .loading-state {
