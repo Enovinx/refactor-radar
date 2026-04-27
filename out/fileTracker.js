@@ -458,7 +458,7 @@ class FileTracker {
         // findFiles only accepts one include pattern, so scan per-extension.
         const allFiles = [];
         for (const inc of includes) {
-            const pattern = new vscode.RelativePattern(workspaceFolders[0], inc);
+            const pattern = new vscode.RelativePattern(root, inc);
             const uris = await vscode.workspace.findFiles(pattern, exclude);
             allFiles.push(...uris);
         }
