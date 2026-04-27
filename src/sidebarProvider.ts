@@ -17,6 +17,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     files: any[];
     ignoredFiles: any[];
     configs: any[];
+    scanSettings: any;
     promptTemplate: string;
     promptVariables: string[];
     defaultPromptTemplate: string;
@@ -67,6 +68,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       files: [],
       ignoredFiles: this.tracker.getIgnoredFiles(),
       configs: this.tracker.getConfigs(),
+      scanSettings: this.tracker.getScanSettings(),
       isLoading: true,
       promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
       promptVariables: PROMPT_TEMPLATE_VARIABLES,
@@ -103,6 +105,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           files: [],
           ignoredFiles: this.tracker.getIgnoredFiles(),
           configs: this.tracker.getConfigs(),
+          scanSettings: this.tracker.getScanSettings(),
           isLoading: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
@@ -147,6 +150,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           files,
           ignoredFiles: this.tracker.getIgnoredFiles(),
           configs,
+          scanSettings: this.tracker.getScanSettings(),
           isLoading: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
@@ -247,6 +251,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         case 'removeCustom': {
           this.tracker.removeCustomConfig(msg.languageId);
+          void this.pushState(true);
+          break;
+        }
+
+        case 'updateIgnoreGitIgnore': {
+          this.tracker.updateIgnoreGitIgnore(Boolean(msg.enabled));
+          void this.pushState(true);
+          break;
+        }
+
+        case 'updateMaxFilesToScan': {
+          const parsed = Number(msg.maxFilesToScan);
+          this.tracker.updateMaxFilesToScan(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+          void this.pushState(true);
+          break;
+        }
+
+        case 'addIgnoredFolder': {
+          this.tracker.addIgnoredFolder(String(msg.folder || ''));
+          void this.pushState(true);
+          break;
+        }
+
+        case 'removeIgnoredFolder': {
+          this.tracker.removeIgnoredFolder(String(msg.folder || ''));
           void this.pushState(true);
           break;
         }

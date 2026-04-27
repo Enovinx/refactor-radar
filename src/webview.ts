@@ -12,6 +12,11 @@ export interface WebviewState {
   files: TrackedFile[];
   ignoredFiles: IgnoredFile[];
   configs: LanguageConfig[];
+  scanSettings: {
+    ignoreGitIgnore: boolean;
+    maxFilesToScan: number | null;
+    ignoredFolders: string[];
+  };
   isLoading: boolean;
   promptTemplate: string;
   promptVariables: string[];
