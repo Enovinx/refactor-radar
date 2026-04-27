@@ -15,6 +15,9 @@ export interface WebviewState {
   isLoading: boolean;
   promptTemplate: string;
   promptVariables: string[];
+  batchPromptTemplate: string;
+  batchPromptVariables: string[];
+  defaultBatchPromptTemplate: string;
   defaultPromptTemplate: string;
 }
 
@@ -263,6 +266,38 @@ export function getWebviewContent(state: WebviewState, script: string): string {
     .configs-toolbar {
       margin-bottom: 12px;
     }
+    .alerts-toolbar {
+      display: flex;
+      gap: 6px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.2));
+    }
+    .alerts-search { flex: 1; }
+    .alerts-sort {
+      font-family: var(--vscode-font-family);
+      font-size: 11px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, transparent);
+      border-radius: 3px;
+      padding: 3px 6px;
+    }
+    .folder-node {
+      border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.15));
+      margin-left: 6px;
+    }
+    .folder-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 6px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .folder-summary::-webkit-details-marker { display: none; }
+    .folder-title { font-size: 12px; font-weight: 600; }
+    .folder-children { margin-left: 8px; }
     .configs-search {
       width: 100%;
     }

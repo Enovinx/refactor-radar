@@ -40,6 +40,9 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     isLoading: boolean;
     promptTemplate: string;
     promptVariables: string[];
+    batchPromptTemplate: string;
+    batchPromptVariables: string[];
+    defaultBatchPromptTemplate: string;
     defaultPromptTemplate: string;
   }
 
@@ -67,6 +70,9 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     isLoading: true,
     promptTemplate: '',
     promptVariables: [],
+    batchPromptTemplate: '',
+    batchPromptVariables: [],
+    defaultBatchPromptTemplate: '',
     defaultPromptTemplate: '',
   };
 
@@ -75,6 +81,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     activeTab: 'alerts' as 'alerts' | 'configs' | 'prompts',
     configsSubTab: 'language' as 'language' | 'ignore' | 'customLanguage' | 'manageFolders',
     alertsSearch: '',
+    alertsSort: 'overageDesc' as 'overageDesc' | 'overageAsc',
     ignoredSearch: '',
     configsSearch: ''
   };
@@ -187,6 +194,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       emit({ type: 'cancelPermanentIgnore', filePath });
     },
     copyPrompt: (filePath: string, fileData: TrackedFile) => emit({ type: 'copyPrompt', filePath, fileData }),
+    copyFolderPrompt: (folderName: string, filePaths: string[]) => emit({ type: 'copyBatchPrompt', folderName, filePaths }),
     updateThreshold: (languageId: string, value: string) => {
       const lines = parseInt(value, 10);
       if (!isNaN(lines) && lines > 0) emit({ type: 'updateThreshold', languageId, lines });
@@ -221,15 +229,36 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     toggleSection: (name: 'files' | 'settings') => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
     updateIgnoredSearch: (value: string) => { state2.ignoredSearch = value; renderRoot(); },
     updateAlertsSearch: (value: string) => { state2.alertsSearch = value; renderRoot(); },
+    updateAlertsSort: (value: string) => {
+      state2.alertsSort = value === 'overageAsc' ? 'overageAsc' : 'overageDesc';
+      renderRoot();
+    },
     updateConfigsSearch: (value: string) => { state2.configsSearch = value; renderRoot(); },
     savePromptTemplate: () => {
       const textarea = document.getElementById('prompt-template') as HTMLTextAreaElement | null;
       if (!textarea) { return; }
       emit({ type: 'savePromptTemplate', template: textarea.value });
     },
+    saveBatchPromptTemplate: () => {
+      const textarea = document.getElementById('batch-prompt-template') as HTMLTextAreaElement | null;
+      if (!textarea) { return; }
+      emit({ type: 'saveBatchPromptTemplate', template: textarea.value });
+    },
     resetPromptTemplate: () => emit({ type: 'resetPromptTemplate' as const }),
+    resetBatchPromptTemplate: () => emit({ type: 'resetBatchPromptTemplate' as const }),
     insertPromptVariable: (variable: string) => {
       const textarea = document.getElementById('prompt-template') as HTMLTextAreaElement | null;
+      if (!textarea) { return; }
+      const start = textarea.selectionStart ?? textarea.value.length;
+      const end = textarea.selectionEnd ?? textarea.value.length;
+      textarea.value = textarea.value.slice(0, start) + variable + textarea.value.slice(end);
+      textarea.focus();
+      const cursor = start + variable.length;
+      textarea.selectionStart = cursor;
+      textarea.selectionEnd = cursor;
+    },
+    insertBatchPromptVariable: (variable: string) => {
+      const textarea = document.getElementById('batch-prompt-template') as HTMLTextAreaElement | null;
       if (!textarea) { return; }
       const start = textarea.selectionStart ?? textarea.value.length;
       const end = textarea.selectionEnd ?? textarea.value.length;
@@ -385,6 +414,44 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     }
   }
 
+  interface FolderNode {
+    name: string;
+    path: string;
+    files: TrackedFile[];
+    children: Map<string, FolderNode>;
+  }
+
+  function normalizeFolderSegments(filePath: string): string[] {
+    const normalized = filePath.replace(/\\/g, '/');
+    const parts = normalized.split('/').filter(Boolean);
+    return parts.slice(0, Math.max(0, parts.length - 1));
+  }
+
+  function buildFolderTree(files: TrackedFile[]): FolderNode {
+    const root: FolderNode = { name: '', path: '', files: [], children: new Map() };
+
+    for (const file of files) {
+      const segments = normalizeFolderSegments(file.filePath);
+      let current = root;
+      let runningPath = '';
+      for (const segment of segments) {
+        runningPath = runningPath ? runningPath + '/' + segment : segment;
+        if (!current.children.has(segment)) {
+          current.children.set(segment, {
+            name: segment,
+            path: runningPath,
+            files: [],
+            children: new Map(),
+          });
+        }
+        current = current.children.get(segment)!;
+      }
+      current.files.push(file);
+    }
+
+    return root;
+  }
+
   const render = {
     fileCard: (file: TrackedFile): string => {
       const { escHtml } = utils;
@@ -405,6 +472,33 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           '<button class="btn-ghost btn-md" data-action="ignoreForever" data-file="' + escHtml(encodedPath) + '">all</button>' +
         '</div>' +
       '</div>';
+    },
+    folderNode: (node: FolderNode): string => {
+      const childMarkup = Array.from(node.children.values())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(child => render.folderNode(child))
+        .join('');
+      const fileMarkup = [...node.files]
+        .sort((a, b) => b.overage - a.overage)
+        .map(render.fileCard)
+        .join('');
+      const allPaths = [
+        ...node.files.map(file => file.filePath),
+        ...Array.from(node.children.values()).flatMap(function collectPaths(child): string[] {
+          const nested = Array.from(child.children.values()).flatMap(collectPaths);
+          return [...child.files.map(file => file.filePath), ...nested];
+        }),
+      ];
+
+      return '<details class="folder-node" open>' +
+        '<summary class="folder-summary">' +
+          '<span class="folder-title">📁 ' + utils.escHtml(node.name || '.') + '</span>' +
+          '<span class="folder-actions">' +
+            '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
+          '</span>' +
+        '</summary>' +
+        '<div class="folder-children">' + childMarkup + fileMarkup + '</div>' +
+      '</details>';
     },
     thresholdRow: (cfg: LanguageConfig): string => {
       const { escHtml } = utils;
@@ -477,12 +571,24 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       '</div>';
 
       const alertsSearch = state2.alertsSearch.trim().toLowerCase();
-      const filteredFiles = alertsSearch
+      const searchedFiles = alertsSearch
         ? files.filter(file =>
             file.fileName.toLowerCase().includes(alertsSearch) ||
             file.filePath.toLowerCase().includes(alertsSearch)
           )
         : files;
+      const filteredFiles = [...searchedFiles].sort((a, b) => {
+        if (state2.alertsSort === 'overageAsc') {
+          return a.overage - b.overage;
+        }
+        return b.overage - a.overage;
+      });
+      const folderTree = buildFolderTree(filteredFiles);
+      const rootFileMarkup = folderTree.files.map(render.fileCard).join('');
+      const folderMarkup = rootFileMarkup + Array.from(folderTree.children.values())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(render.folderNode)
+        .join('');
 
       const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
         '<span>Files Over Threshold</span>' +
@@ -492,10 +598,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       '<div class="section-body ' + (collapsed.files ? 'collapsed' : '') + '">' +
         '<div class="alerts-toolbar">' +
           '<input type="text" id="alerts-search" class="alerts-search" placeholder="Search alerts..." value="' + utils.escHtml(state2.alertsSearch) + '" />' +
+          '<select id="alerts-sort" class="alerts-sort">' +
+            '<option value="overageDesc"' + (state2.alertsSort === 'overageDesc' ? ' selected' : '') + '>Most over first</option>' +
+            '<option value="overageAsc"' + (state2.alertsSort === 'overageAsc' ? ' selected' : '') + '>Least over first</option>' +
+          '</select>' +
         '</div>' +
         (filteredFiles.length === 0
           ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
-          : filteredFiles.map(render.fileCard).join('')) +
+          : folderMarkup) +
       '</div>';
 
       const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
@@ -564,14 +674,26 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       const promptVariables = (state.promptVariables || [])
         .map(v => '<button class="btn-ghost btn-sm" data-action="insertPromptVariable" data-variable="' + utils.escHtml(v) + '">' + utils.escHtml(v) + '</button>')
         .join('');
+      const batchPromptVariables = (state.batchPromptVariables || [])
+        .map(v => '<button class="btn-ghost btn-sm" data-action="insertBatchPromptVariable" data-variable="' + utils.escHtml(v) + '">' + utils.escHtml(v) + '</button>')
+        .join('');
       const promptsPanel = '<div class="panel-prompts ' + (activeTab === 'prompts' ? 'visible' : '') + '">' +
         '<div class="settings-body">' +
-          '<p class="settings-description">Customize the copied AI prompt. Use variables below to insert dynamic values.</p>' +
+          '<p class="settings-description">Customize copied prompts. Use variables below to insert dynamic values.</p>' +
+          '<p class="settings-description"><strong>Single file prompt</strong></p>' +
           '<div class="prompt-vars-row">' + promptVariables + '</div>' +
           '<textarea id="prompt-template" class="prompt-template" rows="12" placeholder="Enter custom prompt template...">' + utils.escHtml(state.promptTemplate || '') + '</textarea>' +
           '<div class="prompt-actions">' +
             '<button class="btn-primary" data-action="savePromptTemplate">Save Prompt</button>' +
             '<button class="btn-secondary" data-action="resetPromptTemplate">Reset to Default</button>' +
+          '</div>' +
+          '<hr class="settings-divider" />' +
+          '<p class="settings-description"><strong>Batch folder prompt</strong></p>' +
+          '<div class="prompt-vars-row">' + batchPromptVariables + '</div>' +
+          '<textarea id="batch-prompt-template" class="prompt-template" rows="8" placeholder="Enter custom batch prompt template...">' + utils.escHtml(state.batchPromptTemplate || '') + '</textarea>' +
+          '<div class="prompt-actions">' +
+            '<button class="btn-primary" data-action="saveBatchPromptTemplate">Save Batch Prompt</button>' +
+            '<button class="btn-secondary" data-action="resetBatchPromptTemplate">Reset Batch Default</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -589,6 +711,17 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
 
   function decodeFilePath(value: string | undefined): string {
     return value ? decodeURIComponent(value) : '';
+  }
+
+  function decodeFilePathList(value: string | undefined): string[] {
+    if (!value) { return []; }
+    try {
+      const decoded = decodeURIComponent(value);
+      const parsed = JSON.parse(decoded);
+      return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
   }
 
   function onClick(e: MouseEvent) {
@@ -629,6 +762,12 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       case 'ignoreForever':
         actions.ignoreForever(decodeFilePath(actionEl.dataset.file));
         break;
+      case 'copyFolderPrompt':
+        actions.copyFolderPrompt(
+          decodeFilePath(actionEl.dataset.folder),
+          decodeFilePathList(actionEl.dataset.files)
+        );
+        break;
       case 'removeLineBonus':
         actions.removeLineBonus(decodeFilePath(actionEl.dataset.file));
         break;
@@ -646,7 +785,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
         actions.addCustom();
         break;
       case 'switchTab':
-        if (actionEl.dataset.tab === 'alerts' || actionEl.dataset.tab === 'configs' || actionEl.dataset.tab === 'ignored' || actionEl.dataset.tab === 'prompts') {
+        if (actionEl.dataset.tab === 'alerts' || actionEl.dataset.tab === 'configs' || actionEl.dataset.tab === 'prompts') {
           actions.switchTab(actionEl.dataset.tab);
         }
         break;
@@ -661,9 +800,20 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       case 'resetPromptTemplate':
         actions.resetPromptTemplate();
         break;
+      case 'saveBatchPromptTemplate':
+        actions.saveBatchPromptTemplate();
+        break;
+      case 'resetBatchPromptTemplate':
+        actions.resetBatchPromptTemplate();
+        break;
       case 'insertPromptVariable':
         if (actionEl.dataset.variable) {
           actions.insertPromptVariable(actionEl.dataset.variable);
+        }
+        break;
+      case 'insertBatchPromptVariable':
+        if (actionEl.dataset.variable) {
+          actions.insertBatchPromptVariable(actionEl.dataset.variable);
         }
         break;
       case 'togglePuzzle':
@@ -673,8 +823,15 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
   }
 
   function onChange(e: Event) {
-    const target = e.target as HTMLInputElement | null;
-    if (!target || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
+    const target = e.target as HTMLInputElement | HTMLSelectElement | null;
+    if (!target) {
+      return;
+    }
+    if (target instanceof HTMLSelectElement && target.id === 'alerts-sort') {
+      actions.updateAlertsSort(target.value);
+      return;
+    }
+    if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
       return;
     }
     actions.updateThreshold(target.dataset.language, target.value);

@@ -68,12 +68,14 @@ class FileTracker {
         this.configs = [];
         this.ignoreMap = new Map();
         this.promptTemplate = '';
+        this.batchPromptTemplate = '';
         // ── File scanning ─────────────────────────────────────────────────────────
         this.fileCache = new Map();
         this.onChange = onChange;
         this.loadConfigs();
         this.loadIgnoredFiles();
         this.loadPromptTemplate();
+        this.loadBatchPromptTemplate();
     }
     // ── Config persistence ────────────────────────────────────────────────────
     loadConfigs() {
@@ -87,6 +89,9 @@ class FileTracker {
     }
     loadPromptTemplate() {
         this.promptTemplate = this.context.workspaceState.get('promptTemplate', '');
+    }
+    loadBatchPromptTemplate() {
+        this.batchPromptTemplate = this.context.workspaceState.get('batchPromptTemplate', '');
     }
     normalizeFilePath(filePath) {
         const normalized = path.normalize(filePath);
@@ -106,11 +111,17 @@ class FileTracker {
     savePromptTemplate() {
         this.context.workspaceState.update('promptTemplate', this.promptTemplate);
     }
+    saveBatchPromptTemplate() {
+        this.context.workspaceState.update('batchPromptTemplate', this.batchPromptTemplate);
+    }
     getConfigs() {
         return this.configs;
     }
     getPromptTemplate() {
         return this.promptTemplate;
+    }
+    getBatchPromptTemplate() {
+        return this.batchPromptTemplate;
     }
     setPromptTemplate(template) {
         this.promptTemplate = template;
@@ -120,6 +131,16 @@ class FileTracker {
     resetPromptTemplate() {
         this.promptTemplate = '';
         this.savePromptTemplate();
+        this.onChange();
+    }
+    setBatchPromptTemplate(template) {
+        this.batchPromptTemplate = template;
+        this.saveBatchPromptTemplate();
+        this.onChange();
+    }
+    resetBatchPromptTemplate() {
+        this.batchPromptTemplate = '';
+        this.saveBatchPromptTemplate();
         this.onChange();
     }
     updateThreshold(languageId, lines) {
@@ -322,7 +343,7 @@ class FileTracker {
         const allFiles = [];
         for (const inc of includes) {
             const pattern = new vscode.RelativePattern(workspaceFolders[0], inc);
-            const uris = await vscode.workspace.findFiles(pattern, exclude, 2000);
+            const uris = await vscode.workspace.findFiles(pattern, exclude);
             allFiles.push(...uris);
         }
         console.log('Scanning workspace...2');

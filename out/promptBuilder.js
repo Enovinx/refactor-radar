@@ -33,16 +33,22 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PROMPT_TEMPLATE_VARIABLES = exports.DEFAULT_REFACTOR_PROMPT_TEMPLATE = void 0;
+exports.BATCH_PROMPT_TEMPLATE_VARIABLES = exports.PROMPT_TEMPLATE_VARIABLES = exports.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE = exports.DEFAULT_REFACTOR_PROMPT_TEMPLATE = void 0;
 exports.buildRefactorPrompt = buildRefactorPrompt;
+exports.buildBatchRefactorPrompt = buildBatchRefactorPrompt;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 exports.DEFAULT_REFACTOR_PROMPT_TEMPLATE = 'Refactor this file by splitting it while leaving behaviour the same and respecting the current project organisation. Target line count for individual files: [targetlinecount], over by [linecountover]. File path: [file path].';
+exports.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE = 'Refactor files in folder [foldername] while preserving behaviour and existing architecture. Focus these files first:\n[allfilenames]';
 exports.PROMPT_TEMPLATE_VARIABLES = [
     '[file content]',
     '[file path]',
     '[targetlinecount]',
     '[linecountover]',
+];
+exports.BATCH_PROMPT_TEMPLATE_VARIABLES = [
+    '[foldername]',
+    '[allfilenames]',
 ];
 function applyTemplate(template, replacements) {
     const aliases = {
@@ -50,6 +56,8 @@ function applyTemplate(template, replacements) {
         '[file path]': ['[file path]', '[filepath]'],
         '[targetlinecount]': ['[targetlinecount]'],
         '[linecountover]': ['[linecountover]'],
+        '[foldername]': ['[foldername]'],
+        '[allfilenames]': ['[allfilenames]'],
     };
     let output = template;
     for (const key of Object.keys(aliases)) {
@@ -82,5 +90,17 @@ function buildRefactorPrompt(file, code, template) {
         '[file path]': toWorkspaceRelativePath(file.filePath),
         '[targetlinecount]': String(file.threshold),
         '[linecountover]': String(file.overage),
+    });
+}
+function buildBatchRefactorPrompt(folderName, filePaths, template) {
+    const sourceTemplate = template && template.trim().length > 0
+        ? template
+        : exports.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE;
+    const normalizedFiles = filePaths
+        .map(toWorkspaceRelativePath)
+        .sort((a, b) => a.localeCompare(b));
+    return applyTemplate(sourceTemplate, {
+        '[foldername]': folderName,
+        '[allfilenames]': normalizedFiles.join('\n'),
     });
 }

@@ -19,11 +19,17 @@
         isLoading: true,
         promptTemplate: '',
         promptVariables: [],
+        batchPromptTemplate: '',
+        batchPromptVariables: [],
+        defaultBatchPromptTemplate: '',
         defaultPromptTemplate: '',
     };
     const state2 = {
         collapsed: { files: false, settings: false },
         activeTab: 'alerts',
+        configsSubTab: 'language',
+        alertsSearch: '',
+        alertsSort: 'overageDesc',
         ignoredSearch: '',
         configsSearch: ''
     };
@@ -125,6 +131,7 @@
             emit({ type: 'cancelPermanentIgnore', filePath });
         },
         copyPrompt: (filePath, fileData) => emit({ type: 'copyPrompt', filePath, fileData }),
+        copyFolderPrompt: (folderName, filePaths) => emit({ type: 'copyBatchPrompt', folderName, filePaths }),
         updateThreshold: (languageId, value) => {
             const lines = parseInt(value, 10);
             if (!isNaN(lines) && lines > 0)
@@ -135,6 +142,8 @@
             const extInput = document.getElementById('new-ext');
             const linesInput = document.getElementById('new-lines');
             const errEl = document.getElementById('add-error');
+            if (!extInput || !linesInput)
+                return;
             const ext = extInput.value.trim().replace(/^\.+/, '');
             const lines = parseInt(linesInput.value, 10);
             errEl.textContent = '';
@@ -148,14 +157,19 @@
             }
             const extension = '.' + ext;
             upsertPredictedCustomConfig(extension, lines);
+            state2.configsSubTab = 'language';
             renderRoot();
             emit({ type: 'addCustom', extension, lines });
-            extInput.value = '';
-            linesInput.value = '';
         },
         switchTab: (tab) => { state2.activeTab = tab; renderRoot(); },
+        switchConfigTab: (tab) => { state2.configsSubTab = tab; renderRoot(); },
         toggleSection: (name) => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
         updateIgnoredSearch: (value) => { state2.ignoredSearch = value; renderRoot(); },
+        updateAlertsSearch: (value) => { state2.alertsSearch = value; renderRoot(); },
+        updateAlertsSort: (value) => {
+            state2.alertsSort = value === 'overageAsc' ? 'overageAsc' : 'overageDesc';
+            renderRoot();
+        },
         updateConfigsSearch: (value) => { state2.configsSearch = value; renderRoot(); },
         savePromptTemplate: () => {
             const textarea = document.getElementById('prompt-template');
@@ -164,9 +178,30 @@
             }
             emit({ type: 'savePromptTemplate', template: textarea.value });
         },
+        saveBatchPromptTemplate: () => {
+            const textarea = document.getElementById('batch-prompt-template');
+            if (!textarea) {
+                return;
+            }
+            emit({ type: 'saveBatchPromptTemplate', template: textarea.value });
+        },
         resetPromptTemplate: () => emit({ type: 'resetPromptTemplate' }),
+        resetBatchPromptTemplate: () => emit({ type: 'resetBatchPromptTemplate' }),
         insertPromptVariable: (variable) => {
             const textarea = document.getElementById('prompt-template');
+            if (!textarea) {
+                return;
+            }
+            const start = textarea.selectionStart ?? textarea.value.length;
+            const end = textarea.selectionEnd ?? textarea.value.length;
+            textarea.value = textarea.value.slice(0, start) + variable + textarea.value.slice(end);
+            textarea.focus();
+            const cursor = start + variable.length;
+            textarea.selectionStart = cursor;
+            textarea.selectionEnd = cursor;
+        },
+        insertBatchPromptVariable: (variable) => {
+            const textarea = document.getElementById('batch-prompt-template');
             if (!textarea) {
                 return;
             }
@@ -300,6 +335,33 @@
             next.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
         }
     }
+    function normalizeFolderSegments(filePath) {
+        const normalized = filePath.replace(/\\/g, '/');
+        const parts = normalized.split('/').filter(Boolean);
+        return parts.slice(0, Math.max(0, parts.length - 1));
+    }
+    function buildFolderTree(files) {
+        const root = { name: '', path: '', files: [], children: new Map() };
+        for (const file of files) {
+            const segments = normalizeFolderSegments(file.filePath);
+            let current = root;
+            let runningPath = '';
+            for (const segment of segments) {
+                runningPath = runningPath ? runningPath + '/' + segment : segment;
+                if (!current.children.has(segment)) {
+                    current.children.set(segment, {
+                        name: segment,
+                        path: runningPath,
+                        files: [],
+                        children: new Map(),
+                    });
+                }
+                current = current.children.get(segment);
+            }
+            current.files.push(file);
+        }
+        return root;
+    }
     const render = {
         fileCard: (file) => {
             const { escHtml } = utils;
@@ -320,6 +382,32 @@
                 '<button class="btn-ghost btn-md" data-action="ignoreForever" data-file="' + escHtml(encodedPath) + '">all</button>' +
                 '</div>' +
                 '</div>';
+        },
+        folderNode: (node) => {
+            const childMarkup = Array.from(node.children.values())
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(child => render.folderNode(child))
+                .join('');
+            const fileMarkup = [...node.files]
+                .sort((a, b) => b.overage - a.overage)
+                .map(render.fileCard)
+                .join('');
+            const allPaths = [
+                ...node.files.map(file => file.filePath),
+                ...Array.from(node.children.values()).flatMap(function collectPaths(child) {
+                    const nested = Array.from(child.children.values()).flatMap(collectPaths);
+                    return [...child.files.map(file => file.filePath), ...nested];
+                }),
+            ];
+            return '<details class="folder-node" open>' +
+                '<summary class="folder-summary">' +
+                '<span class="folder-title">📁 ' + utils.escHtml(node.name || '.') + '</span>' +
+                '<span class="folder-actions">' +
+                '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
+                '</span>' +
+                '</summary>' +
+                '<div class="folder-children">' + childMarkup + fileMarkup + '</div>' +
+                '</details>';
         },
         thresholdRow: (cfg) => {
             const { escHtml } = utils;
@@ -381,67 +469,130 @@
             });
             const nav = '<div class="nav-bar">' +
                 '<button class="nav-tab ' + (activeTab === 'alerts' ? 'active' : '') + '" data-action="switchTab" data-tab="alerts">Alerts</button>' +
-                '<button class="nav-tab ' + (activeTab === 'ignored' ? 'active' : '') + '" data-action="switchTab" data-tab="ignored">Ignored</button>' +
                 '<button class="nav-tab ' + (activeTab === 'configs' ? 'active' : '') + '" data-action="switchTab" data-tab="configs">Configs</button>' +
                 '<button class="nav-tab ' + (activeTab === 'prompts' ? 'active' : '') + '" data-action="switchTab" data-tab="prompts">Prompts</button>' +
                 '</div>';
+            const alertsSearch = state2.alertsSearch.trim().toLowerCase();
+            const searchedFiles = alertsSearch
+                ? files.filter(file => file.fileName.toLowerCase().includes(alertsSearch) ||
+                    file.filePath.toLowerCase().includes(alertsSearch))
+                : files;
+            const filteredFiles = [...searchedFiles].sort((a, b) => {
+                if (state2.alertsSort === 'overageAsc') {
+                    return a.overage - b.overage;
+                }
+                return b.overage - a.overage;
+            });
+            const folderTree = buildFolderTree(filteredFiles);
+            const rootFileMarkup = folderTree.files.map(render.fileCard).join('');
+            const folderMarkup = rootFileMarkup + Array.from(folderTree.children.values())
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(render.folderNode)
+                .join('');
             const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
                 '<span>Files Over Threshold</span>' +
                 (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '') +
                 '<span class="chevron ' + (collapsed.files ? 'collapsed' : '') + '">▾</span>' +
                 '</div>' +
                 '<div class="section-body ' + (collapsed.files ? 'collapsed' : '') + '">' +
-                (files.length === 0
-                    ? '<div class="empty-state">All files are within their line thresholds.</div>'
-                    : files.map(render.fileCard).join('')) +
+                '<div class="alerts-toolbar">' +
+                '<input type="text" id="alerts-search" class="alerts-search" placeholder="Search alerts..." value="' + utils.escHtml(state2.alertsSearch) + '" />' +
+                '<select id="alerts-sort" class="alerts-sort">' +
+                '<option value="overageDesc"' + (state2.alertsSort === 'overageDesc' ? ' selected' : '') + '>Most over first</option>' +
+                '<option value="overageAsc"' + (state2.alertsSort === 'overageAsc' ? ' selected' : '') + '>Least over first</option>' +
+                '</select>' +
+                '</div>' +
+                (filteredFiles.length === 0
+                    ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
+                    : folderMarkup) +
                 '</div>';
-            const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
-                '<span>Line Thresholds</span>' +
-                '<span class="chevron ' + (collapsed.settings ? 'collapsed' : '') + '">▾</span>' +
-                '</div>' +
-                '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
-                '<div class="settings-body">' +
-                '<p class="settings-description">Set the maximum line count per file type.</p>' +
-                '<div class="configs-toolbar">' +
-                '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
-                '</div>' +
+            const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language config</button>' +
+                '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore config</button>' +
+                '</div>';
+            const customLangForm = '<div class="settings-body">' +
+                '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="language">← Back</button>' +
                 '<div class="add-custom-row" style="margin-bottom: 12px;">' +
                 '<input type="text" id="new-ext" placeholder=".ext" maxlength="12" />' +
                 '<input type="number" id="new-lines" placeholder="lines" min="10" max="9999" />' +
                 '<button class="btn-primary" data-action="addCustom">Add custom</button>' +
                 '</div>' +
                 '<p id="add-error" class="error-msg"></p>' +
+                '</div>';
+            const languageView = '<div class="settings-body">' +
+                '<p class="settings-description">Set the maximum line count per file type.</p>' +
+                '<div class="configs-toolbar">' +
+                '<input type="text" id="configs-search" class="configs-search" placeholder="Search languages..." value="' + utils.escHtml(state2.configsSearch) + '" />' +
+                '</div>' +
+                '<button class="btn-secondary" style="margin-bottom: 12px; width: 100%" data-action="switchConfigTab" data-tab="customLanguage">Add custom language</button>' +
                 '<table class="threshold-table"><thead><tr><th>Language</th><th>Max lines</th><th></th></tr></thead><tbody>' +
                 sortedConfigs.map(render.thresholdRow).join('') +
                 '</tbody></table>' +
-                '</div>' +
                 '</div>';
-            const alertsPanel = '<div class="panel-alerts ' + (activeTab === 'alerts' ? 'visible' : '') + '">' + filesSection + '</div>';
-            const ignoredPanel = '<div class="panel-ignored ' + (activeTab === 'ignored' ? 'visible' : '') + '">' +
-                '<div class="ignored-toolbar">' +
+            const ignoreView = '<div class="settings-body">' +
+                '<div class="ignored-toolbar" style="padding-left:0; padding-right:0;">' +
                 '<input type="text" id="ignored-search" class="ignored-search" placeholder="Search ignored files..." value="' + utils.escHtml(state2.ignoredSearch) + '" />' +
                 '</div>' +
-                '<div class="ignored-note">Manage ignored files and line bonuses from one place.</div>' +
+                '<button class="btn-secondary" style="margin: 8px 0; width: 100%" data-action="switchConfigTab" data-tab="manageFolders">Manage ignored folders</button>' +
+                '<div class="ignored-note" style="padding-left:0; padding-right:0;">Manage ignored files and line bonuses from one place.</div>' +
                 (filteredIgnoredFiles.length === 0
                     ? '<div class="empty-state">' + (ignoredFiles.length === 0 ? 'No ignored files yet.' : 'No ignored files match your search.') + '</div>'
                     : filteredIgnoredFiles.map(render.ignoredCard).join('')) +
                 '</div>';
+            const manageFoldersView = '<div class="settings-body">' +
+                '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="ignore">← Back</button>' +
+                '<p class="settings-description">Add folders to ignore based on root. Also disable/enable git ignore.</p>' +
+                '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;"><input type="checkbox" id="toggle-gitignore" /> Enable gitignore for refactor</label>' +
+                '<div class="add-custom-row" style="margin-bottom: 12px;">' +
+                '<input type="text" id="new-folder" placeholder="folder/path" style="flex:1" />' +
+                '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
+                '</div>' +
+                '</div>';
+            let activeConfigView = '';
+            if (state2.configsSubTab === 'language')
+                activeConfigView = languageView;
+            else if (state2.configsSubTab === 'customLanguage')
+                activeConfigView = customLangForm;
+            else if (state2.configsSubTab === 'ignore')
+                activeConfigView = ignoreView;
+            else if (state2.configsSubTab === 'manageFolders')
+                activeConfigView = manageFoldersView;
+            const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
+                '<span>Configs</span>' +
+                '<span class="chevron ' + (collapsed.settings ? 'collapsed' : '') + '">▾</span>' +
+                '</div>' +
+                '<div class="section-body ' + (collapsed.settings ? 'collapsed' : '') + '">' +
+                configTabs + activeConfigView +
+                '</div>';
+            const alertsPanel = '<div class="panel-alerts ' + (activeTab === 'alerts' ? 'visible' : '') + '">' + filesSection + '</div>';
             const configsPanel = '<div class="panel-configs ' + (activeTab === 'configs' ? 'visible' : '') + '">' + settingsSection + '</div>';
             const promptVariables = (state.promptVariables || [])
                 .map(v => '<button class="btn-ghost btn-sm" data-action="insertPromptVariable" data-variable="' + utils.escHtml(v) + '">' + utils.escHtml(v) + '</button>')
                 .join('');
+            const batchPromptVariables = (state.batchPromptVariables || [])
+                .map(v => '<button class="btn-ghost btn-sm" data-action="insertBatchPromptVariable" data-variable="' + utils.escHtml(v) + '">' + utils.escHtml(v) + '</button>')
+                .join('');
             const promptsPanel = '<div class="panel-prompts ' + (activeTab === 'prompts' ? 'visible' : '') + '">' +
                 '<div class="settings-body">' +
-                '<p class="settings-description">Customize the copied AI prompt. Use variables below to insert dynamic values.</p>' +
+                '<p class="settings-description">Customize copied prompts. Use variables below to insert dynamic values.</p>' +
+                '<p class="settings-description"><strong>Single file prompt</strong></p>' +
                 '<div class="prompt-vars-row">' + promptVariables + '</div>' +
                 '<textarea id="prompt-template" class="prompt-template" rows="12" placeholder="Enter custom prompt template...">' + utils.escHtml(state.promptTemplate || '') + '</textarea>' +
                 '<div class="prompt-actions">' +
                 '<button class="btn-primary" data-action="savePromptTemplate">Save Prompt</button>' +
                 '<button class="btn-secondary" data-action="resetPromptTemplate">Reset to Default</button>' +
                 '</div>' +
+                '<hr class="settings-divider" />' +
+                '<p class="settings-description"><strong>Batch folder prompt</strong></p>' +
+                '<div class="prompt-vars-row">' + batchPromptVariables + '</div>' +
+                '<textarea id="batch-prompt-template" class="prompt-template" rows="8" placeholder="Enter custom batch prompt template...">' + utils.escHtml(state.batchPromptTemplate || '') + '</textarea>' +
+                '<div class="prompt-actions">' +
+                '<button class="btn-primary" data-action="saveBatchPromptTemplate">Save Batch Prompt</button>' +
+                '<button class="btn-secondary" data-action="resetBatchPromptTemplate">Reset Batch Default</button>' +
+                '</div>' +
                 '</div>' +
                 '</div>';
-            document.getElementById('root').innerHTML = loadingState + '<div class="' + contentClass + '">' + nav + alertsPanel + ignoredPanel + configsPanel + promptsPanel + '</div>';
+            document.getElementById('root').innerHTML = loadingState + '<div class="' + contentClass + '">' + nav + alertsPanel + configsPanel + promptsPanel + '</div>';
         }
     };
     function renderRoot() {
@@ -452,6 +603,19 @@
     }
     function decodeFilePath(value) {
         return value ? decodeURIComponent(value) : '';
+    }
+    function decodeFilePathList(value) {
+        if (!value) {
+            return [];
+        }
+        try {
+            const decoded = decodeURIComponent(value);
+            const parsed = JSON.parse(decoded);
+            return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+        }
+        catch {
+            return [];
+        }
     }
     function onClick(e) {
         const target = e.target;
@@ -490,6 +654,9 @@
             case 'ignoreForever':
                 actions.ignoreForever(decodeFilePath(actionEl.dataset.file));
                 break;
+            case 'copyFolderPrompt':
+                actions.copyFolderPrompt(decodeFilePath(actionEl.dataset.folder), decodeFilePathList(actionEl.dataset.files));
+                break;
             case 'removeLineBonus':
                 actions.removeLineBonus(decodeFilePath(actionEl.dataset.file));
                 break;
@@ -507,7 +674,7 @@
                 actions.addCustom();
                 break;
             case 'switchTab':
-                if (actionEl.dataset.tab === 'alerts' || actionEl.dataset.tab === 'configs' || actionEl.dataset.tab === 'ignored' || actionEl.dataset.tab === 'prompts') {
+                if (actionEl.dataset.tab === 'alerts' || actionEl.dataset.tab === 'configs' || actionEl.dataset.tab === 'prompts') {
                     actions.switchTab(actionEl.dataset.tab);
                 }
                 break;
@@ -522,9 +689,20 @@
             case 'resetPromptTemplate':
                 actions.resetPromptTemplate();
                 break;
+            case 'saveBatchPromptTemplate':
+                actions.saveBatchPromptTemplate();
+                break;
+            case 'resetBatchPromptTemplate':
+                actions.resetBatchPromptTemplate();
+                break;
             case 'insertPromptVariable':
                 if (actionEl.dataset.variable) {
                     actions.insertPromptVariable(actionEl.dataset.variable);
+                }
+                break;
+            case 'insertBatchPromptVariable':
+                if (actionEl.dataset.variable) {
+                    actions.insertBatchPromptVariable(actionEl.dataset.variable);
                 }
                 break;
             case 'togglePuzzle':
@@ -534,7 +712,14 @@
     }
     function onChange(e) {
         const target = e.target;
-        if (!target || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
+        if (!target) {
+            return;
+        }
+        if (target instanceof HTMLSelectElement && target.id === 'alerts-sort') {
+            actions.updateAlertsSort(target.value);
+            return;
+        }
+        if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
             return;
         }
         actions.updateThreshold(target.dataset.language, target.value);
@@ -549,6 +734,9 @@
         }
         else if (target.id === 'configs-search') {
             actions.updateConfigsSearch(target.value);
+        }
+        else if (target.id === 'alerts-search') {
+            actions.updateAlertsSearch(target.value);
         }
     }
     function onKeyDown(e) {
