@@ -301,6 +301,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       renderRoot();
       emit({ type: 'addIgnoredFolder', folder });
     },
+    ignoreFolder: (folderPath: string) => {
+      const normalized = folderPath.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+      if (!normalized) { return; }
+      if (state.scanSettings.ignoredFolders.includes(normalized)) { return; }
+      state.scanSettings.ignoredFolders = [...state.scanSettings.ignoredFolders, normalized].sort((a, b) => a.localeCompare(b));
+      renderRoot();
+      emit({ type: 'addIgnoredFolder', folder: normalized });
+    },
     removeIgnoredFolder: (folder: string) => {
       state.scanSettings.ignoredFolders = state.scanSettings.ignoredFolders.filter(item => item !== folder);
       renderRoot();
@@ -589,10 +597,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           '</div>' +
         '</summary>' +
         '<div class="file-actions">' +
-          '<button class="btn-primary" data-action="copyPrompt" data-file="' + escHtml(encodedPath) + '">Copy AI Prompt</button>' +
-          '<span class="ignore-label">Ignore:</span>' +
-          '<button class="btn-ghost btn-md" data-action="ignoreForLines" data-file="' + escHtml(encodedPath) + '" data-linecount="' + file.lineCount + '">+ 200</button>' +
-          '<button class="btn-ghost btn-md" data-action="ignoreForever" data-file="' + escHtml(encodedPath) + '">all</button>' +
+          '<div class="file-actions-row">' +
+            '<button class="btn-primary" data-action="copyPrompt" data-file="' + escHtml(encodedPath) + '">Copy AI Prompt</button>' +
+          '</div>' +
+          '<div class="file-actions-row">' +
+            '<span class="ignore-label">Ignore:</span>' +
+            '<button class="btn-ghost btn-md" data-action="ignoreForLines" data-file="' + escHtml(encodedPath) + '" data-linecount="' + file.lineCount + '">+ 200</button>' +
+            '<button class="btn-ghost btn-md" data-action="ignoreForever" data-file="' + escHtml(encodedPath) + '">all</button>' +
+          '</div>' +
         '</div>' +
       '</details>';
     },
@@ -627,7 +639,8 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           '</button>' +
           '<span class="folder-actions">' +
             (showFolderPrompt
-              ? '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>'
+              ? '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
+                '<button class="btn-ghost btn-sm" data-action="ignoreFolder" data-folder="' + utils.escHtml(encodeURIComponent(node.path)) + '">Ignore</button>'
               : '') +
           '</span>' +
         '</div>' +
@@ -874,6 +887,10 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     const action = actionEl.dataset.action;
     if (!action) { return; }
 
+    if (actionEl.classList.contains('alert-summary') && action !== 'openFile') {
+      return;
+    }
+
     switch (action) {
       case 'openFile':
         actions.openFile(decodeFilePath(actionEl.dataset.file));
@@ -909,6 +926,9 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
           decodeFilePath(actionEl.dataset.folder),
           decodeFilePathList(actionEl.dataset.files)
         );
+        break;
+      case 'ignoreFolder':
+        actions.ignoreFolder(decodeFilePath(actionEl.dataset.folder));
         break;
       case 'toggleFolderExpand':
         actions.toggleFolderExpand(decodeFilePath(actionEl.dataset.folder));
@@ -1001,9 +1021,14 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
       actions.updateConfigsSection(target.value);
       return;
     }
+    if (target instanceof HTMLInputElement && target.id === 'max-files-to-scan') {
+      actions.updateMaxFilesToScan(target.value);
+      return;
+    }
     if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
       return;
     }
+    actions.updateThreshold(target.dataset.language, target.value);
   }
 
   function onInput(e: Event) {

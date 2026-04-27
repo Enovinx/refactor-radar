@@ -39,7 +39,7 @@ exports.buildBatchRefactorPrompt = buildBatchRefactorPrompt;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 exports.DEFAULT_REFACTOR_PROMPT_TEMPLATE = 'Refactor this file by splitting it while leaving behaviour the same and respecting the current project organisation. Target line count for individual files: [targetlinecount], over by [linecountover]. File path: [file path].';
-exports.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE = 'Refactor files in folder [foldername] while preserving behaviour and existing architecture. Focus these files first:\n[allfilenames]';
+exports.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE = 'Refactor files in folder [foldername] while preserving behaviour and existing architecture. These are the files that need refactoring:\n[allfilenames]';
 exports.PROMPT_TEMPLATE_VARIABLES = [
     '[file content]',
     '[file path]',
