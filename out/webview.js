@@ -83,6 +83,15 @@ function getWebviewContent(state, script) {
       padding: 8px 12px;
     }
     .file-card:last-child { border-bottom: none; }
+    details.file-card {
+      padding: 0;
+    }
+    .alert-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 8px 12px;
+    }
+    .alert-summary::-webkit-details-marker { display: none; }
 
     .file-meta {
       display: flex;
@@ -107,6 +116,9 @@ function getWebviewContent(state, script) {
     .file-stats {
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
+      margin-bottom: 0;
+    }
+    details.file-card[open] .file-stats {
       margin-bottom: 6px;
     }
     .file-stats span { margin-right: 10px; }
@@ -116,6 +128,17 @@ function getWebviewContent(state, script) {
       display: flex;
       gap: 4px;
       flex-wrap: wrap;
+    }
+    details.file-card .file-actions,
+    .folder-actions {
+      display: none;
+    }
+    details.file-card[open] .file-actions {
+      display: flex;
+      padding: 0 12px 8px;
+    }
+    .folder-node[open] > .folder-summary .folder-actions {
+      display: inline-flex;
     }
 
     .file-actions .ignore-label {
@@ -269,7 +292,7 @@ function getWebviewContent(state, script) {
     }
     .folder-node {
       border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.15));
-      margin-left: 6px;
+      margin-left: 0;
     }
     .folder-summary {
       list-style: none;
@@ -297,7 +320,7 @@ function getWebviewContent(state, script) {
       height: 14px;
       flex-shrink: 0;
     }
-    .folder-children { margin-left: 8px; }
+    .folder-children { margin-left: 0; }
     .configs-search {
       width: 100%;
     }
