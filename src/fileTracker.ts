@@ -353,7 +353,7 @@ export class FileTracker {
     const allFiles: vscode.Uri[] = [];
     for (const inc of includes) {
       const pattern = new vscode.RelativePattern(workspaceFolders[0], inc);
-      const uris = await vscode.workspace.findFiles(pattern, exclude, 2000);
+      const uris = await vscode.workspace.findFiles(pattern, exclude);
       allFiles.push(...uris);
     }
 
