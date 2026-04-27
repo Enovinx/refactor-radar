@@ -301,7 +301,22 @@ export function getWebviewContent(state: WebviewState, script: string): string {
       gap: 8px;
     }
     .folder-summary::-webkit-details-marker { display: none; }
-    .folder-title { font-size: 12px; font-weight: 600; }
+    .folder-title {
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .folder-icon {
+      color: var(--vscode-descriptionForeground);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
     .folder-children { margin-left: 8px; }
     .configs-search {
       width: 100%;
