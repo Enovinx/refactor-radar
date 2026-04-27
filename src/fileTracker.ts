@@ -37,6 +37,12 @@ export interface IgnoredFile {
   bonusLines?: number;
 }
 
+export interface ScanSettings {
+  ignoreGitIgnore: boolean;
+  maxFilesToScan: number | null;
+  ignoredFolders: string[];
+}
+
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
 export const DEFAULT_LANGUAGE_CONFIGS: Omit<LanguageConfig, 'isCustom'>[] = [
@@ -70,6 +76,11 @@ export class FileTracker {
   private ignoreMap: Map<string, IgnoreEntry> = new Map();
   private promptTemplate = '';
   private batchPromptTemplate = '';
+  private scanSettings: ScanSettings = {
+    ignoreGitIgnore: true,
+    maxFilesToScan: null,
+    ignoredFolders: [],
+  };
   private onChange: () => void;
 
   constructor(
@@ -81,6 +92,7 @@ export class FileTracker {
     this.loadIgnoredFiles();
     this.loadPromptTemplate();
     this.loadBatchPromptTemplate();
+    this.loadScanSettings();
   }
 
   // ── Config persistence ────────────────────────────────────────────────────
@@ -100,6 +112,22 @@ export class FileTracker {
 
   private loadBatchPromptTemplate() {
     this.batchPromptTemplate = this.context.workspaceState.get<string>('batchPromptTemplate', '');
+  }
+  private loadScanSettings() {
+    const saved = this.context.workspaceState.get<Partial<ScanSettings>>('scanSettings', {});
+    this.scanSettings = {
+      ignoreGitIgnore: saved.ignoreGitIgnore ?? true,
+      maxFilesToScan: typeof saved.maxFilesToScan === 'number' && saved.maxFilesToScan > 0
+        ? Math.floor(saved.maxFilesToScan)
+        : null,
+      ignoredFolders: Array.isArray(saved.ignoredFolders)
+        ? saved.ignoredFolders.filter(Boolean).map(folder => this.normalizeFolderPath(folder))
+        : [],
+    };
+  }
+
+  private saveScanSettings() {
+    void this.context.workspaceState.update('scanSettings', this.scanSettings);
   }
 
   private normalizeFilePath(filePath: string): string {
@@ -140,6 +168,9 @@ export class FileTracker {
   getBatchPromptTemplate(): string {
     return this.batchPromptTemplate;
   }
+  getScanSettings(): ScanSettings {
+    return this.scanSettings;
+  }
 
   setPromptTemplate(template: string) {
     this.promptTemplate = template;
@@ -163,6 +194,39 @@ export class FileTracker {
     this.batchPromptTemplate = '';
     this.saveBatchPromptTemplate();
     this.onChange();
+  }
+
+  updateIgnoreGitIgnore(enabled: boolean) {
+    this.scanSettings.ignoreGitIgnore = enabled;
+    this.saveScanSettings();
+    this.onChange();
+  }
+
+  updateMaxFilesToScan(value: number | null) {
+    this.scanSettings.maxFilesToScan = value && value > 0 ? Math.floor(value) : null;
+    this.saveScanSettings();
+    this.onChange();
+  }
+
+  addIgnoredFolder(folder: string) {
+    const normalized = this.normalizeFolderPath(folder);
+    if (!normalized) { return; }
+    if (!this.scanSettings.ignoredFolders.includes(normalized)) {
+      this.scanSettings.ignoredFolders.push(normalized);
+      this.scanSettings.ignoredFolders.sort((a, b) => a.localeCompare(b));
+      this.saveScanSettings();
+      this.onChange();
+    }
+  }
+
+  removeIgnoredFolder(folder: string) {
+    const normalized = this.normalizeFolderPath(folder);
+    const next = this.scanSettings.ignoredFolders.filter(existing => existing !== normalized);
+    if (next.length !== this.scanSettings.ignoredFolders.length) {
+      this.scanSettings.ignoredFolders = next;
+      this.saveScanSettings();
+      this.onChange();
+    }
   }
 
   updateThreshold(languageId: string, lines: number) {
@@ -359,6 +423,64 @@ export class FileTracker {
 
   private fileCache = new Map<string, { mtime: number, lineCount: number, languageId: string }>();
 
+  private normalizeFolderPath(folder: string): string {
+    return folder
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
+  }
+
+  private globToRegExp(pattern: string): RegExp {
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*/g, '::DOUBLE_STAR::')
+      .replace(/\*/g, '[^/]*')
+      .replace(/\?/g, '[^/]')
+      .replace(/::DOUBLE_STAR::/g, '.*');
+    return new RegExp(`^${escaped}$`);
+  }
+
+  private async getGitIgnoreMatchers(root: vscode.WorkspaceFolder): Promise<Array<{ negated: boolean; regex: RegExp }>> {
+    const filePath = path.join(root.uri.fsPath, '.gitignore');
+    try {
+      const content = await fs.promises.readFile(filePath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      const patterns: Array<{ negated: boolean; regex: RegExp }> = [];
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) { continue; }
+        const negated = line.startsWith('!');
+        const working = negated ? line.slice(1) : line;
+        if (!working) { continue; }
+
+        if (working.endsWith('/')) {
+          const base = this.normalizeFolderPath(working);
+          const regex = this.globToRegExp(`**/${base}/**`);
+          patterns.push({ negated, regex });
+          continue;
+        }
+
+        const normalized = this.normalizeFolderPath(working);
+        const scopedPattern = normalized.includes('/') ? normalized : `**/${normalized}`;
+        patterns.push({ negated, regex: this.globToRegExp(scopedPattern) });
+      }
+      return patterns;
+    } catch {
+      return [];
+    }
+  }
+
+  private isIgnoredByPatterns(relativePath: string, patterns: Array<{ negated: boolean; regex: RegExp }>): boolean {
+    let ignored = false;
+    for (const pattern of patterns) {
+      if (pattern.regex.test(relativePath)) {
+        ignored = !pattern.negated;
+      }
+    }
+    return ignored;
+  }
+
   async getOverThresholdFiles(): Promise<TrackedFile[]> {
     console.log('Scanning workspace...');
     const results: TrackedFile[] = [];
@@ -375,10 +497,15 @@ export class FileTracker {
     const includes = this.getScanGlobPatterns();
     const exclude = this.getScanExcludeGlob();
 
+    const root = workspaceFolders[0];
+    const gitIgnorePatterns = this.scanSettings.ignoreGitIgnore
+      ? await this.getGitIgnoreMatchers(root)
+      : [];
+
     // findFiles only accepts one include pattern, so scan per-extension.
     const allFiles: vscode.Uri[] = [];
     for (const inc of includes) {
-      const pattern = new vscode.RelativePattern(workspaceFolders[0], inc);
+      const pattern = new vscode.RelativePattern(root, inc);
       const uris = await vscode.workspace.findFiles(pattern, exclude);
       allFiles.push(...uris);
     }
@@ -396,8 +523,22 @@ export class FileTracker {
 
       console.log('Scanning workspace..x');
 
+    const maxFiles = this.scanSettings.maxFilesToScan ?? Number.POSITIVE_INFINITY;
+    let scannedCount = 0;
+    const ignoredFolderSet = new Set(this.scanSettings.ignoredFolders.map(folder => this.normalizeFolderPath(folder)));
+
     for (const uri of uniqueFiles) {
+      if (scannedCount >= maxFiles) { break; }
       if (skippedSchemes.has(uri.scheme)) { continue; }
+      const relativePath = this.normalizeFolderPath(path.relative(root.uri.fsPath, uri.fsPath));
+      if (!relativePath) { continue; }
+      if (Array.from(ignoredFolderSet).some(folder => relativePath === folder || relativePath.startsWith(`${folder}/`))) {
+        continue;
+      }
+      if (gitIgnorePatterns.length > 0 && this.isIgnoredByPatterns(relativePath, gitIgnorePatterns)) {
+        continue;
+      }
+      scannedCount += 1;
 
       let lineCount: number;
       let languageId: string;
