@@ -106,7 +106,8 @@ function getWebviewContent(state, script) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      flex: 1;
+      flex: 0 1 auto;
+      max-width: 100%;
       min-width: 0;
       cursor: pointer;
       color: var(--vscode-foreground);
@@ -126,8 +127,15 @@ function getWebviewContent(state, script) {
 
     .file-actions {
       display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-start;
+    }
+    .file-actions-row {
+      display: flex;
       gap: 4px;
       flex-wrap: wrap;
+      align-items: center;
     }
     details.file-card .file-actions {
       display: none;
@@ -138,7 +146,7 @@ function getWebviewContent(state, script) {
     }
 
     .file-actions .ignore-label {
-      margin-left: 12px;
+      margin-left: 0;
       margin-right: 2px;
       align-self: center;
     }
