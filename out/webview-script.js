@@ -32,11 +32,9 @@
     const state2 = {
         collapsed: { files: false, settings: false },
         activeTab: 'alerts',
-        configsSubTab: 'language',
-        alertsSearch: '',
-        alertsSort: 'overageDesc',
         configsSubTab: 'home',
         alertsSearch: '',
+        alertsSort: 'overageDesc',
         ignoredSearch: '',
         configsSearch: ''
     };
@@ -407,6 +405,14 @@
         }
         return root;
     }
+    function minimizeFolderTree(root) {
+        let current = root;
+        while (current.files.length === 0 && current.children.size === 1) {
+            const onlyChild = Array.from(current.children.values())[0];
+            current = onlyChild;
+        }
+        return current;
+    }
     const render = {
         fileCard: (file) => {
             const { escHtml } = utils;
@@ -446,7 +452,14 @@
             ];
             return '<details class="folder-node" open>' +
                 '<summary class="folder-summary">' +
-                '<span class="folder-title">📁 ' + utils.escHtml(node.name || '.') + '</span>' +
+                '<span class="folder-title">' +
+                '<span class="folder-icon" aria-hidden="true">' +
+                '<svg viewBox="0 0 16 16" width="14" height="14" focusable="false">' +
+                '<path fill="currentColor" d="M1.5 3.5h4.1l1.1 1.5h7.8v7.5a1 1 0 0 1-1 1h-12a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" opacity="0.85"></path>' +
+                '</svg>' +
+                '</span>' +
+                utils.escHtml(node.name || '.') +
+                '</span>' +
                 '<span class="folder-actions">' +
                 '<button class="btn-secondary btn-sm" data-action="copyFolderPrompt" data-folder="' + utils.escHtml(encodeURIComponent(node.path || '.')) + '" data-files="' + utils.escHtml(encodeURIComponent(JSON.stringify(allPaths))) + '">Copy Prompt</button>' +
                 '</span>' +
@@ -528,12 +541,13 @@
                 }
                 return b.overage - a.overage;
             });
-            const folderTree = buildFolderTree(filteredFiles);
-            const rootFileMarkup = folderTree.files.map(render.fileCard).join('');
-            const folderMarkup = rootFileMarkup + Array.from(folderTree.children.values())
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map(render.folderNode)
-                .join('');
+            const folderTree = minimizeFolderTree(buildFolderTree(filteredFiles));
+            const folderMarkup = folderTree.name || folderTree.path
+                ? render.folderNode(folderTree)
+                : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(render.folderNode)
+                    .join('');
             const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
                 '<span>Files Over Threshold</span>' +
                 (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '') +
@@ -550,14 +564,6 @@
                 (filteredFiles.length === 0
                     ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
                     : folderMarkup) +
-                '</div>';
-            const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
-                '<button class="nav-tab ' + (state2.configsSubTab === 'language' || state2.configsSubTab === 'customLanguage' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="language">Language config</button>' +
-                '<button class="nav-tab ' + (state2.configsSubTab === 'ignore' || state2.configsSubTab === 'manageFolders' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="ignore">Ignore config</button>' +
-                '</div>' +
-                (filteredFiles.length === 0
-                    ? '<div class="empty-state">All files are within their line thresholds or no results match your search.</div>'
-                    : filteredFiles.map(render.fileCard).join('')) +
                 '</div>';
             const configTabs = '<div class="nav-bar" style="border-bottom:none; margin-bottom: 10px;">' +
                 '<button class="nav-tab ' + (state2.configsSubTab === 'home' ? 'active' : '') + '" data-action="switchConfigTab" data-tab="home">Categories</button>' +
@@ -604,16 +610,11 @@
                 '</div>';
             const manageFoldersView = '<div class="settings-body">' +
                 '<button class="btn-ghost btn-sm" style="margin-bottom: 12px;" data-action="switchConfigTab" data-tab="ignore">← Back</button>' +
-                '<p class="settings-description">Add folders to ignore based on root. Also disable/enable git ignore.</p>' +
-                '<label style="display:flex; align-items:center; gap:6px; margin-bottom: 12px;"><input type="checkbox" id="toggle-gitignore" /> Enable gitignore for refactor</label>' +
                 '<p class="settings-description">Add folders to ignore from workspace root.</p>' +
                 '<div class="add-custom-row" style="margin-bottom: 12px;">' +
                 '<input type="text" id="new-folder" placeholder="folder/path" style="flex:1" />' +
                 '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
                 '</div>' +
-                '</div>';
-            let activeConfigView = '';
-            if (state2.configsSubTab === 'language')
                 '<p id="folder-error" class="error-msg"></p>' +
                 (state.scanSettings.ignoredFolders.length === 0
                     ? '<div class="empty-state">No ignored folders yet.</div>'
@@ -639,10 +640,6 @@
                 activeConfigView = customLangForm;
             else if (state2.configsSubTab === 'ignore')
                 activeConfigView = ignoreView;
-            else if (state2.configsSubTab === 'manageFolders')
-                activeConfigView = manageFoldersView;
-            const settingsSection = '<div class="section-header" data-action="toggleSection" data-section="settings">' +
-                '<span>Configs</span>' +
             else if (state2.configsSubTab === 'scan')
                 activeConfigView = scanView;
             else if (state2.configsSubTab === 'manageFolders')
@@ -828,12 +825,6 @@
             return;
         }
         if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
-        if (target.dataset.action === 'updateThreshold' && target.dataset.language) {
-            actions.updateThreshold(target.dataset.language, target.value);
-            return;
-        }
-        if (target.id === 'max-files-to-scan') {
-            actions.updateMaxFilesToScan(target.value);
             return;
         }
     }
