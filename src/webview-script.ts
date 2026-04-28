@@ -11,7 +11,7 @@ declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
     'Polishing refactor radar lenses...',
     'Negotiating with suspiciously long files...',
     'Plotting a cleaner code trajectory...',
-    'Triangulating hotspots in your codebase...',
+    'Triangulating hotspots in your codebase...'
   ];
 
   const PUZZLE_SIZE = 4;
