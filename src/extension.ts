@@ -22,7 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Refresh command ───────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('refactorRadar.refresh', () => {
-      sidebar.refresh();
+      sidebar.refresh(true);
     })
   );
 

@@ -8,7 +8,7 @@
         'Polishing refactor radar lenses...',
         'Negotiating with suspiciously long files...',
         'Plotting a cleaner code trajectory...',
-        'Triangulating hotspots in your codebase...',
+        'Triangulating hotspots in your codebase...'
     ];
     const PUZZLE_SIZE = 4;
     const PUZZLE_CELL_COUNT = PUZZLE_SIZE * PUZZLE_SIZE;
@@ -22,6 +22,7 @@
             ignoredFolders: [],
         },
         isLoading: true,
+        loadingProgress: 0,
         promptTemplate: '',
         promptVariables: [],
         batchPromptTemplate: '',
@@ -39,9 +40,11 @@
         configsSearch: '',
         expandedFolders: new Set(),
         activeFolderPrompt: null,
+        activeFileCard: null,
     };
     let loadingMessage = LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)];
     let loadingMessageTimer;
+    let loadingProgressTimer;
     let loadingPuzzle = createLoadingPuzzle();
     const emit = (msg) => vscode.postMessage(msg);
     function upsertPredictedCustomConfig(extension, lines) {
@@ -70,6 +73,18 @@
     }
     function removePredictedCustomConfig(languageId) {
         state.configs = state.configs.filter(cfg => !(cfg.languageId === languageId && cfg.isCustom));
+    }
+    function removePredictedIgnoredFolder(folderPath) {
+        const normalized = folderPath.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        if (!normalized) {
+            return;
+        }
+        const prefix = normalized + '/';
+        state.files = state.files.filter(file => file.filePath !== normalized && !file.filePath.startsWith(prefix));
+        state2.expandedFolders.delete(normalized);
+        if (state2.activeFolderPrompt && (state2.activeFolderPrompt === normalized || state2.activeFolderPrompt.startsWith(prefix))) {
+            state2.activeFolderPrompt = null;
+        }
     }
     const actions = {
         openFile: (filePath) => emit({ type: 'openFile', filePath }),
@@ -145,6 +160,17 @@
                 emit({ type: 'updateThreshold', languageId, lines });
         },
         removeCustom: (languageId) => emit({ type: 'removeCustom', languageId }),
+        setActiveFileCard: (filePath) => {
+            state2.activeFileCard = filePath;
+            renderRoot();
+        },
+        toggleFileCard: (filePath) => {
+            if (!filePath) {
+                return;
+            }
+            state2.activeFileCard = state2.activeFileCard === filePath ? null : filePath;
+            renderRoot();
+        },
         addCustom: () => {
             const extInput = document.getElementById('new-ext');
             const linesInput = document.getElementById('new-lines');
@@ -242,6 +268,7 @@
             if (state.scanSettings.ignoredFolders.includes(normalized)) {
                 return;
             }
+            removePredictedIgnoredFolder(normalized);
             state.scanSettings.ignoredFolders = [...state.scanSettings.ignoredFolders, normalized].sort((a, b) => a.localeCompare(b));
             renderRoot();
             emit({ type: 'addIgnoredFolder', folder: normalized });
@@ -391,6 +418,36 @@
             loadingMessageTimer = undefined;
         }
     }
+    function syncLoadingProgressToDom() {
+        const progress = state.isLoading ? Math.max(8, Math.min(96, Number(state.loadingProgress || 0))) : 100;
+        const progressEl = document.getElementById('loading-progress');
+        if (progressEl) {
+            progressEl.textContent = progress + '%';
+        }
+        const fillEl = document.getElementById('loading-progress-fill');
+        if (fillEl) {
+            fillEl.style.width = progress + '%';
+        }
+    }
+    function ensureLoadingProgressTimer() {
+        if (state.isLoading) {
+            if (loadingProgressTimer === undefined) {
+                loadingProgressTimer = window.setInterval(() => {
+                    const current = Math.max(8, Math.min(96, Number(state.loadingProgress || 0)));
+                    state.loadingProgress = Math.min(96, current + Math.max(1, Math.floor(Math.random() * 5)));
+                    syncLoadingProgressToDom();
+                }, 250);
+            }
+            syncLoadingProgressToDom();
+            return;
+        }
+        if (loadingProgressTimer !== undefined) {
+            window.clearInterval(loadingProgressTimer);
+            loadingProgressTimer = undefined;
+        }
+        state.loadingProgress = 100;
+        syncLoadingProgressToDom();
+    }
     function takeFocusSnapshot() {
         const active = document.activeElement;
         if (!(active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) || !active.id) {
@@ -485,8 +542,9 @@
         fileCard: (file) => {
             const { escHtml } = utils;
             const encodedPath = encodeURIComponent(file.filePath);
-            return '<details class="file-card alert-node">' +
-                '<summary class="alert-summary">' +
+            const isActive = state2.activeFileCard === file.filePath;
+            return '<details class="file-card alert-node"' + (isActive ? ' open' : '') + '>' +
+                '<summary class="alert-summary" data-action="toggleFileCard" data-file="' + escHtml(encodedPath) + '">' +
                 '<div class="file-meta">' +
                 '<span class="file-name" title="' + escHtml(file.filePath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
                 '</div>' +
@@ -495,6 +553,7 @@
                 '<span>limit: ' + file.threshold + '</span>' +
                 '<span class="overage">+' + file.overage + ' over</span>' +
                 '</div>' +
+                '<span class="alert-chevron" aria-hidden="true">▸</span>' +
                 '</summary>' +
                 '<div class="file-actions">' +
                 '<div class="file-actions-row">' +
@@ -577,8 +636,11 @@
                 '</div>';
         },
         root: () => {
+            const loadingProgress = state.isLoading ? Math.max(8, Math.min(96, Number(state.loadingProgress || 0))) : 100;
             const loadingState = '<div class="loading-state ' + (state.isLoading ? 'visible' : '') + '">' +
                 '<div class="loading-title">Loading extension state...</div>' +
+                '<div id="loading-progress" class="loading-progress">' + loadingProgress + '%</div>' +
+                '<div class="loading-progress-track"><div id="loading-progress-fill" class="loading-progress-fill" style="width:' + loadingProgress + '%"></div></div>' +
                 '<div id="loading-message" class="loading-message">' + utils.escHtml(loadingMessage) + '</div>' +
                 '<div id="loading-puzzle" class="loading-puzzle">' + loadingPuzzleMarkup() + '</div>' +
                 '</div>';
@@ -743,6 +805,7 @@
         render.root();
         restoreFocusSnapshot(focusSnapshot);
         ensureLoadingMessageTimer();
+        ensureLoadingProgressTimer();
     }
     function decodeFilePath(value) {
         return value ? decodeURIComponent(value) : '';
@@ -770,12 +833,16 @@
         if (!action) {
             return;
         }
-        if (actionEl.classList.contains('alert-summary') && action !== 'openFile') {
+        if (actionEl.classList.contains('alert-summary') && action !== 'openFile' && action !== 'toggleFileCard') {
             return;
         }
         switch (action) {
             case 'openFile':
+                actions.setActiveFileCard(decodeFilePath(actionEl.dataset.file));
                 actions.openFile(decodeFilePath(actionEl.dataset.file));
+                break;
+            case 'toggleFileCard':
+                actions.toggleFileCard(decodeFilePath(actionEl.dataset.file));
                 break;
             case 'copyPrompt': {
                 const filePath = decodeFilePath(actionEl.dataset.file);
@@ -934,10 +1001,17 @@
             window.clearInterval(loadingMessageTimer);
             loadingMessageTimer = undefined;
         }
+        if (loadingProgressTimer !== undefined) {
+            window.clearInterval(loadingProgressTimer);
+            loadingProgressTimer = undefined;
+        }
     });
     window.addEventListener('message', (e) => {
         if (e.data.type === 'updateState') {
             state = e.data.state;
+            if (!state.isLoading) {
+                state.loadingProgress = 100;
+            }
             renderRoot();
         }
     });

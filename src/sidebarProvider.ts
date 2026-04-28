@@ -51,11 +51,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  refresh() {
+  refresh(force = false) {
     if (!this.view) { return; }
     // Debounce rapid refreshes (e.g. on fast typing)
     if (this.refreshDebounce) { clearTimeout(this.refreshDebounce); }
-    this.refreshDebounce = setTimeout(() => this.pushState(), 150);
+    this.refreshDebounce = setTimeout(() => this.pushState(force), 150);
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
@@ -76,6 +76,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       configs: this.tracker.getConfigs(),
       scanSettings: this.tracker.getScanSettings(),
       isLoading: true,
+      loadingProgress: 0,
       promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
       promptVariables: PROMPT_TEMPLATE_VARIABLES,
       batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
@@ -99,10 +100,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const state = await this.buildState();
+      const state = await this.buildState(forceRebuild);
       if (!this.view || pushId !== this.statePushId) { return; }
       this.updateBadge(state.files.length);
-      this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false } });
+      this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false, loadingProgress: 100 } });
     } catch (err) {
       if (!this.view || pushId !== this.statePushId) { return; }
       console.error('Refactor Radar: failed to build state', err);
@@ -116,6 +117,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           configs: this.tracker.getConfigs(),
           scanSettings: this.tracker.getScanSettings(),
           isLoading: false,
+          loadingProgress: 100,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
           batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
@@ -149,13 +151,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private async buildState() {
+  private async buildState(forceRefresh = false) {
     // Coalesce concurrent refreshes into a single scan.
     if (!this.buildInFlight) {
       this.buildInFlight = (async () => {
         console.log("Building state...");
         const [files, configs] = await Promise.all([
-          this.tracker.getOverThresholdFiles(),
+          this.tracker.getOverThresholdFiles(forceRefresh),
           Promise.resolve(this.tracker.getConfigs()),
         ]);
         return {
