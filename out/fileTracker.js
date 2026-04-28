@@ -34,124 +34,36 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FileTracker = exports.DEFAULT_LANGUAGE_CONFIGS = void 0;
-const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
-const fs = __importStar(require("fs"));
-// ─── Defaults ────────────────────────────────────────────────────────────────
-exports.DEFAULT_LANGUAGE_CONFIGS = [
-    { languageId: 'typescript', displayName: 'TypeScript', extension: '.ts', lines: 300 },
-    { languageId: 'typescriptreact', displayName: 'TSX', extension: '.tsx', lines: 300 },
-    { languageId: 'javascript', displayName: 'JavaScript', extension: '.js', lines: 300 },
-    { languageId: 'javascriptreact', displayName: 'JSX', extension: '.jsx', lines: 300 },
-    { languageId: 'python', displayName: 'Python', extension: '.py', lines: 500 },
-    { languageId: 'java', displayName: 'Java', extension: '.java', lines: 400 },
-    { languageId: 'c', displayName: 'C', extension: '.c', lines: 500 },
-    { languageId: 'cpp', displayName: 'C++', extension: '.cpp', lines: 500 },
-    { languageId: 'go', displayName: 'Go', extension: '.go', lines: 400 },
-    { languageId: 'rust', displayName: 'Rust', extension: '.rs', lines: 400 },
-    { languageId: 'php', displayName: 'PHP', extension: '.php', lines: 400 },
-    { languageId: 'ruby', displayName: 'Ruby', extension: '.rb', lines: 300 },
-    { languageId: 'css', displayName: 'CSS', extension: '.css', lines: 300 },
-    { languageId: 'scss', displayName: 'SCSS', extension: '.scss', lines: 300 },
-    { languageId: 'html', displayName: 'HTML', extension: '.html', lines: 250 },
-    { languageId: 'vue', displayName: 'Vue', extension: '.vue', lines: 300 },
-    { languageId: 'svelte', displayName: 'Svelte', extension: '.svelte', lines: 300 },
-    { languageId: 'csharp', displayName: 'C#', extension: '.cs', lines: 400 },
-    { languageId: 'kotlin', displayName: 'Kotlin', extension: '.kt', lines: 400 },
-    { languageId: 'swift', displayName: 'Swift', extension: '.swift', lines: 400 },
-    { languageId: 'shellscript', displayName: 'Shell', extension: '.sh', lines: 200 },
-];
-// ─── FileTracker ─────────────────────────────────────────────────────────────
+const vscode = __importStar(require("vscode"));
+const fileTrackerIgnore_1 = require("./fileTrackerIgnore");
+const fileTrackerPathUtils_1 = require("./fileTrackerPathUtils");
+const fileTrackerScan_1 = require("./fileTrackerScan");
+const fileTrackerStorage_1 = require("./fileTrackerStorage");
+var fileTrackerDefaults_1 = require("./fileTrackerDefaults");
+Object.defineProperty(exports, "DEFAULT_LANGUAGE_CONFIGS", { enumerable: true, get: function () { return fileTrackerDefaults_1.DEFAULT_LANGUAGE_CONFIGS; } });
 class FileTracker {
     constructor(context, onChange) {
         this.context = context;
-        this.configs = [];
-        this.ignoreMap = new Map();
-        this.promptTemplate = '';
-        this.batchPromptTemplate = '';
-        this.scanSettings = {
-            ignoreGitIgnore: true,
-            maxFilesToScan: null,
-            ignoredFolders: [],
-        };
-        this.fileCacheByPath = new Map();
-        this.fileCacheByIdentity = new Map();
+        this.onChange = onChange;
         this.lastScanAt = 0;
         this.lastScanResults = [];
-        this.onChange = onChange;
-        this.loadConfigs();
-        this.loadIgnoredFiles();
-        this.loadFileCache();
-        this.loadPromptTemplate();
-        this.loadBatchPromptTemplate();
-        this.loadScanSettings();
-    }
-    // ── Config persistence ────────────────────────────────────────────────────
-    loadConfigs() {
-        const saved = this.context.workspaceState.get('languageConfigs');
-        if (saved && saved.length > 0) {
-            this.configs = saved;
-        }
-        else {
-            this.configs = exports.DEFAULT_LANGUAGE_CONFIGS.map(c => ({ ...c, isCustom: false }));
-        }
-    }
-    loadPromptTemplate() {
-        this.promptTemplate = this.context.workspaceState.get('promptTemplate', '');
-    }
-    loadBatchPromptTemplate() {
-        this.batchPromptTemplate = this.context.workspaceState.get('batchPromptTemplate', '');
-    }
-    loadScanSettings() {
-        const saved = this.context.workspaceState.get('scanSettings', {});
-        this.scanSettings = {
-            ignoreGitIgnore: saved.ignoreGitIgnore ?? true,
-            maxFilesToScan: typeof saved.maxFilesToScan === 'number' && saved.maxFilesToScan > 0
-                ? Math.floor(saved.maxFilesToScan)
-                : null,
-            ignoredFolders: Array.isArray(saved.ignoredFolders)
-                ? saved.ignoredFolders.filter(Boolean).map(folder => this.normalizeFolderPath(folder))
-                : [],
-        };
-    }
-    saveScanSettings() {
-        void this.context.workspaceState.update('scanSettings', this.scanSettings);
-    }
-    normalizeFilePath(filePath) {
-        const normalized = path.normalize(filePath);
-        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-    }
-    loadIgnoredFiles() {
-        const saved = this.context.workspaceState.get('ignoredFiles', {});
-        this.ignoreMap = new Map(Object.entries(saved));
-    }
-    loadFileCache() {
-        const saved = this.context.workspaceState.get('fileCache', {});
-        this.fileCacheByPath = new Map(Object.entries(saved.byPath || {}));
-        this.fileCacheByIdentity = new Map(Object.entries(saved.byIdentity || {}));
-    }
-    saveIgnoredFiles() {
-        const serialized = Object.fromEntries(this.ignoreMap.entries());
-        this.context.workspaceState.update('ignoredFiles', serialized);
-    }
-    saveFileCache() {
-        const serialized = {
-            byPath: Object.fromEntries(this.fileCacheByPath.entries()),
-            byIdentity: Object.fromEntries(this.fileCacheByIdentity.entries()),
-        };
-        this.context.workspaceState.update('fileCache', serialized);
-    }
-    saveConfigs() {
-        this.context.workspaceState.update('languageConfigs', this.configs);
-    }
-    savePromptTemplate() {
-        this.context.workspaceState.update('promptTemplate', this.promptTemplate);
-    }
-    saveBatchPromptTemplate() {
-        this.context.workspaceState.update('batchPromptTemplate', this.batchPromptTemplate);
+        this.configs = (0, fileTrackerStorage_1.loadConfigs)(context);
+        this.ignoreMap = (0, fileTrackerStorage_1.loadIgnoredFiles)(context);
+        const cache = (0, fileTrackerStorage_1.loadFileCache)(context);
+        this.fileCacheByPath = cache.byPath;
+        this.fileCacheByIdentity = cache.byIdentity;
+        this.promptTemplate = (0, fileTrackerStorage_1.loadPromptTemplate)(context);
+        this.batchPromptTemplate = (0, fileTrackerStorage_1.loadBatchPromptTemplate)(context);
+        this.scanSettings = (0, fileTrackerStorage_1.loadScanSettings)(context);
+        this.ignoreService = new fileTrackerIgnore_1.FileTrackerIgnoreService(this.ignoreMap, () => (0, fileTrackerStorage_1.saveIgnoredFiles)(this.context, this.ignoreMap), this.onChange);
+        this.scanService = new fileTrackerScan_1.FileTrackerScanService(this.ignoreService, () => this.configs, () => this.scanSettings, (languageIdOrDoc, fileName) => this.getThreshold(languageIdOrDoc, fileName), this.fileCacheByPath, this.fileCacheByIdentity, () => (0, fileTrackerStorage_1.saveFileCache)(this.context, this.fileCacheByPath, this.fileCacheByIdentity));
     }
     getConfigs() {
         return this.configs;
+    }
+    saveConfigs() {
+        (0, fileTrackerStorage_1.saveConfigs)(this.context, this.configs);
     }
     getPromptTemplate() {
         return this.promptTemplate;
@@ -164,499 +76,133 @@ class FileTracker {
     }
     setPromptTemplate(template) {
         this.promptTemplate = template;
-        this.savePromptTemplate();
+        (0, fileTrackerStorage_1.savePromptTemplate)(this.context, this.promptTemplate);
         this.onChange();
     }
     resetPromptTemplate() {
         this.promptTemplate = '';
-        this.savePromptTemplate();
+        (0, fileTrackerStorage_1.savePromptTemplate)(this.context, this.promptTemplate);
         this.onChange();
     }
     setBatchPromptTemplate(template) {
         this.batchPromptTemplate = template;
-        this.saveBatchPromptTemplate();
+        (0, fileTrackerStorage_1.saveBatchPromptTemplate)(this.context, this.batchPromptTemplate);
         this.onChange();
     }
     resetBatchPromptTemplate() {
         this.batchPromptTemplate = '';
-        this.saveBatchPromptTemplate();
+        (0, fileTrackerStorage_1.saveBatchPromptTemplate)(this.context, this.batchPromptTemplate);
         this.onChange();
     }
     updateIgnoreGitIgnore(enabled) {
         this.scanSettings.ignoreGitIgnore = enabled;
-        this.saveScanSettings();
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
         this.onChange();
     }
     updateMaxFilesToScan(value) {
         this.scanSettings.maxFilesToScan = value && value > 0 ? Math.floor(value) : null;
-        this.saveScanSettings();
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
         this.onChange();
     }
     addIgnoredFolder(folder) {
-        const normalized = this.normalizeFolderPath(folder);
+        const normalized = (0, fileTrackerPathUtils_1.normalizeFolderPath)(folder);
         if (!normalized) {
             return;
         }
         if (!this.scanSettings.ignoredFolders.includes(normalized)) {
             this.scanSettings.ignoredFolders.push(normalized);
             this.scanSettings.ignoredFolders.sort((a, b) => a.localeCompare(b));
-            this.saveScanSettings();
+            (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
             this.onChange();
         }
     }
     removeIgnoredFolder(folder) {
-        const normalized = this.normalizeFolderPath(folder);
+        const normalized = (0, fileTrackerPathUtils_1.normalizeFolderPath)(folder);
         const next = this.scanSettings.ignoredFolders.filter(existing => existing !== normalized);
         if (next.length !== this.scanSettings.ignoredFolders.length) {
             this.scanSettings.ignoredFolders = next;
-            this.saveScanSettings();
+            (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
             this.onChange();
         }
     }
     updateThreshold(languageId, lines) {
-        const cfg = this.configs.find(c => c.languageId === languageId);
-        if (cfg) {
-            cfg.lines = lines;
-            this.saveConfigs();
+        const config = this.configs.find(item => item.languageId === languageId);
+        if (config) {
+            config.lines = lines;
+            (0, fileTrackerStorage_1.saveConfigs)(this.context, this.configs);
             this.onChange();
         }
     }
     addCustomConfig(extension, lines) {
         const ext = extension.startsWith('.') ? extension.slice(1) : extension;
-        const extWithDot = '.' + ext;
-        const langId = 'custom:' + extWithDot;
-        const existing = this.configs.find(c => c.languageId === langId);
+        const extWithDot = `.${ext}`;
+        const languageId = `custom:${extWithDot}`;
+        const existing = this.configs.find(item => item.languageId === languageId);
         if (existing) {
             existing.lines = lines;
         }
         else {
             this.configs.push({
-                languageId: langId,
+                languageId,
                 displayName: ext.toUpperCase(),
                 extension: extWithDot,
                 lines,
                 isCustom: true,
             });
         }
-        this.saveConfigs();
+        (0, fileTrackerStorage_1.saveConfigs)(this.context, this.configs);
         this.onChange();
     }
     removeCustomConfig(languageId) {
-        this.configs = this.configs.filter(c => !(c.languageId === languageId && c.isCustom));
-        this.saveConfigs();
+        this.configs = this.configs.filter(config => !(config.languageId === languageId && config.isCustom));
+        (0, fileTrackerStorage_1.saveConfigs)(this.context, this.configs);
         this.onChange();
     }
-    // ── Threshold resolution ──────────────────────────────────────────────────
     getThreshold(languageIdOrDoc, fileName) {
         const isDoc = typeof languageIdOrDoc !== 'string';
-        const langId = isDoc ? languageIdOrDoc.languageId : languageIdOrDoc;
+        const languageId = isDoc ? languageIdOrDoc.languageId : languageIdOrDoc;
         const name = isDoc ? languageIdOrDoc.fileName : (fileName || '');
-        // 1. Match by languageId
-        const byLang = this.configs.find(c => c.languageId === langId);
-        if (byLang) {
-            return byLang.lines;
+        const byLanguage = this.configs.find(config => config.languageId === languageId);
+        if (byLanguage) {
+            return byLanguage.lines;
         }
-        // 2. Match by file extension (for custom types)
         const ext = path.extname(name).toLowerCase();
-        const byExt = this.configs.find(c => c.extension === ext);
-        if (byExt) {
-            return byExt.lines;
+        const byExtension = this.configs.find(config => config.extension === ext);
+        if (byExtension) {
+            return byExtension.lines;
         }
-        // 3. Global default
-        const defaultCfg = vscode.workspace.getConfiguration('refactorRadar');
-        return defaultCfg.get('defaultThreshold', 300);
+        const defaultConfig = vscode.workspace.getConfiguration('refactorRadar');
+        return defaultConfig.get('defaultThreshold', 300);
     }
-    // ── Ignore state ──────────────────────────────────────────────────────────
     async ignoreForLines(filePath, currentLines, extraLines) {
-        const fileIdentity = (await this.getFileStats(filePath))?.fileIdentity;
-        this.ignoreMap.set(this.normalizeFilePath(filePath), {
-            kind: 'lines',
-            untilLines: currentLines + extraLines,
-            bonusLines: extraLines,
-            originalFilePath: filePath,
-            fileIdentity,
-        });
-        this.saveIgnoredFiles();
-        this.onChange();
+        await this.ignoreService.ignoreForLines(filePath, currentLines, extraLines);
     }
     async ignoreForever(filePath) {
-        const fileIdentity = (await this.getFileStats(filePath))?.fileIdentity;
-        this.ignoreMap.set(this.normalizeFilePath(filePath), {
-            kind: 'forever',
-            originalFilePath: filePath,
-            fileIdentity,
-        });
-        this.saveIgnoredFiles();
-        this.onChange();
+        await this.ignoreService.ignoreForever(filePath);
     }
     unignore(filePath) {
-        this.ignoreMap.delete(this.normalizeFilePath(filePath));
-        this.saveIgnoredFiles();
-        this.onChange();
+        this.ignoreService.unignore(filePath);
     }
     removeLineBonus(filePath) {
-        const normalized = this.normalizeFilePath(filePath);
-        const entry = this.ignoreMap.get(normalized);
-        if (entry?.kind !== 'lines') {
-            return;
-        }
-        this.ignoreMap.delete(normalized);
-        this.saveIgnoredFiles();
-        this.onChange();
+        this.ignoreService.removeLineBonus(filePath);
     }
     cancelPermanentIgnore(filePath) {
-        const normalized = this.normalizeFilePath(filePath);
-        const entry = this.ignoreMap.get(normalized);
-        if (entry?.kind !== 'forever') {
-            return;
-        }
-        this.ignoreMap.delete(normalized);
-        this.saveIgnoredFiles();
-        this.onChange();
+        this.ignoreService.cancelPermanentIgnore(filePath);
     }
     getIgnoredFiles() {
-        const ignoredFiles = Array.from(this.ignoreMap.entries()).map(([filePath, entry]) => ({
-            filePath: entry.originalFilePath || filePath,
-            fileName: path.basename(entry.originalFilePath || filePath),
-            kind: entry.kind,
-            untilLines: entry.untilLines,
-            bonusLines: entry.bonusLines,
-        }));
-        ignoredFiles.sort((a, b) => a.fileName.localeCompare(b.fileName));
-        return ignoredFiles;
-    }
-    isIgnoredEntry(entry, currentLines) {
-        if (!entry) {
-            return false;
-        }
-        if (entry.kind === 'forever') {
-            return true;
-        }
-        // Temporary: ignored whenever the file is within the saved cap.
-        // Keep the rule even if the file temporarily exceeds it, so dropping
-        // back under the cap re-applies the ignore as users expect.
-        if (entry.kind === 'lines' && entry.untilLines !== undefined) {
-            if (currentLines <= entry.untilLines) {
-                return true;
-            }
-        }
-        return false;
-    }
-    getEffectiveThreshold(entry, baseThreshold) {
-        if (entry?.kind === 'lines' && entry.untilLines !== undefined) {
-            return Math.max(baseThreshold, entry.untilLines);
-        }
-        return baseThreshold;
-    }
-    getStatIdentity(stats) {
-        const scheme = process.platform === 'win32' ? 'win-fileid' : 'posix-inode';
-        const dev = stats.dev;
-        const ino = stats.ino;
-        const devString = typeof dev === 'bigint' ? dev.toString() : String(dev);
-        const inoString = typeof ino === 'bigint' ? ino.toString() : String(ino);
-        return `${scheme}:${devString}:${inoString}`;
-    }
-    async getFileStats(filePath) {
-        try {
-            const stats = await fs.promises.stat(filePath, { bigint: true });
-            const mtimeRaw = stats.mtimeMs;
-            const mtime = typeof mtimeRaw === 'bigint' ? Number(mtimeRaw) : mtimeRaw;
-            const fileIdentity = this.getStatIdentity(stats);
-            return { mtime, fileIdentity };
-        }
-        catch {
-            return undefined;
-        }
-    }
-    async resolveIgnoreEntry(fileName, fileIdentity) {
-        const normalizedPath = this.normalizeFilePath(fileName);
-        const directEntry = this.ignoreMap.get(normalizedPath);
-        if (directEntry) {
-            let changed = false;
-            if (fileIdentity && directEntry.fileIdentity !== fileIdentity) {
-                directEntry.fileIdentity = fileIdentity;
-                changed = true;
-            }
-            if (directEntry.originalFilePath !== fileName) {
-                directEntry.originalFilePath = fileName;
-                changed = true;
-            }
-            if (changed) {
-                this.ignoreMap.set(normalizedPath, directEntry);
-                this.saveIgnoredFiles();
-            }
-            return directEntry;
-        }
-        if (this.ignoreMap.size === 0 || !fileIdentity) {
-            return undefined;
-        }
-        for (const [savedPath, entry] of this.ignoreMap.entries()) {
-            if (!entry.fileIdentity || entry.fileIdentity !== fileIdentity) {
-                continue;
-            }
-            this.ignoreMap.delete(savedPath);
-            this.ignoreMap.set(normalizedPath, {
-                ...entry,
-                originalFilePath: fileName,
-                fileIdentity,
-            });
-            this.saveIgnoredFiles();
-            return this.ignoreMap.get(normalizedPath);
-        }
-        return undefined;
-    }
-    // ── File scanning ─────────────────────────────────────────────────────────
-    normalizeFolderPath(folder) {
-        return folder
-            .trim()
-            .replace(/\\/g, '/')
-            .replace(/^\/+/, '')
-            .replace(/\/+$/, '');
-    }
-    globToRegExp(pattern) {
-        const escaped = pattern
-            .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-            .replace(/\*\*/g, '::DOUBLE_STAR::')
-            .replace(/\*/g, '[^/]*')
-            .replace(/\?/g, '[^/]')
-            .replace(/::DOUBLE_STAR::/g, '.*');
-        return new RegExp(`^${escaped}$`);
-    }
-    async getGitIgnoreMatchers(root) {
-        const filePath = path.join(root.uri.fsPath, '.gitignore');
-        try {
-            const content = await fs.promises.readFile(filePath, 'utf8');
-            const lines = content.split(/\r?\n/);
-            const patterns = [];
-            for (const rawLine of lines) {
-                const line = rawLine.trim();
-                if (!line || line.startsWith('#')) {
-                    continue;
-                }
-                const negated = line.startsWith('!');
-                const working = negated ? line.slice(1) : line;
-                if (!working) {
-                    continue;
-                }
-                if (working.endsWith('/')) {
-                    const base = this.normalizeFolderPath(working);
-                    const regex = this.globToRegExp(`**/${base}/**`);
-                    patterns.push({ negated, regex });
-                    continue;
-                }
-                const normalized = this.normalizeFolderPath(working);
-                const scopedPattern = normalized.includes('/') ? normalized : `**/${normalized}`;
-                patterns.push({ negated, regex: this.globToRegExp(scopedPattern) });
-            }
-            return patterns;
-        }
-        catch {
-            return [];
-        }
-    }
-    isIgnoredByPatterns(relativePath, patterns) {
-        let ignored = false;
-        for (const pattern of patterns) {
-            if (pattern.regex.test(relativePath)) {
-                ignored = !pattern.negated;
-            }
-        }
-        return ignored;
+        return this.ignoreService.getIgnoredFiles();
     }
     async getOverThresholdFiles(force = false) {
-        console.log('Scanning workspace...');
-        const refreshInterval = vscode.workspace.getConfiguration('refactorRadar').get('refreshIntervalMs', 5000);
-        const now = Date.now();
-        if (!force && this.lastScanAt > 0 && now - this.lastScanAt < refreshInterval) {
-            return this.lastScanResults;
-        }
-        const results = [];
-        const skippedSchemes = new Set(['git', 'output', 'debug', 'search-editor']);
-        const skippedLangs = new Set(['markdown', 'plaintext', 'json', 'jsonc', 'log']);
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            return results;
-        }
-        // Limit scanning to relevant files; scanning the whole workspace can be very slow
-        // (and can effectively hang the sidebar render).
-        const includes = this.getScanGlobPatterns();
-        const exclude = this.getScanExcludeGlob();
-        const root = workspaceFolders[0];
-        const gitIgnorePatterns = this.scanSettings.ignoreGitIgnore
-            ? await this.getGitIgnoreMatchers(root)
-            : [];
-        // findFiles only accepts one include pattern, so scan per-extension.
-        const allFiles = [];
-        for (const inc of includes) {
-            const pattern = new vscode.RelativePattern(root, inc);
-            const uris = await vscode.workspace.findFiles(pattern, exclude);
-            allFiles.push(...uris);
-        }
-        console.log('Scanning workspace...2');
-        // De-dupe (multiple globs can match the same file)
-        const seen = new Set();
-        const uniqueFiles = allFiles.filter(u => {
-            const key = u.toString();
-            if (seen.has(key)) {
-                return false;
-            }
-            seen.add(key);
-            return true;
-        });
-        console.log('Scanning workspace..x');
-        const maxFiles = this.scanSettings.maxFilesToScan ?? Number.POSITIVE_INFINITY;
-        let scannedCount = 0;
-        const ignoredFolderSet = new Set(this.scanSettings.ignoredFolders.map(folder => this.normalizeFolderPath(folder)));
-        const seenPaths = new Set();
-        for (const uri of uniqueFiles) {
-            if (scannedCount >= maxFiles) {
-                break;
-            }
-            if (skippedSchemes.has(uri.scheme)) {
-                continue;
-            }
-            const relativePath = this.normalizeFolderPath(path.relative(root.uri.fsPath, uri.fsPath));
-            if (!relativePath) {
-                continue;
-            }
-            if (Array.from(ignoredFolderSet).some(folder => relativePath === folder || relativePath.startsWith(`${folder}/`))) {
-                continue;
-            }
-            if (gitIgnorePatterns.length > 0 && this.isIgnoredByPatterns(relativePath, gitIgnorePatterns)) {
-                continue;
-            }
-            scannedCount += 1;
-            let lineCount;
-            let languageId;
-            let fileIdentity;
-            const fileName = uri.fsPath;
-            const normalizedPath = this.normalizeFilePath(fileName);
-            seenPaths.add(normalizedPath);
-            try {
-                const stats = await this.getFileStats(fileName);
-                if (!stats) {
-                    continue;
-                }
-                const { mtime, fileIdentity: statIdentity } = stats;
-                fileIdentity = statIdentity;
-                const cachedByIdentity = fileIdentity ? this.fileCacheByIdentity.get(fileIdentity) : undefined;
-                const cachedByPath = this.fileCacheByPath.get(normalizedPath);
-                if (cachedByIdentity && cachedByIdentity.mtime === mtime) {
-                    lineCount = cachedByIdentity.lineCount;
-                    languageId = cachedByIdentity.languageId;
-                    if (cachedByIdentity.filePath !== fileName) {
-                        const oldPath = this.normalizeFilePath(cachedByIdentity.filePath);
-                        this.fileCacheByPath.delete(oldPath);
-                        cachedByIdentity.filePath = fileName;
-                        this.fileCacheByPath.set(normalizedPath, cachedByIdentity);
-                    }
-                }
-                else if (cachedByPath && cachedByPath.mtime === mtime) {
-                    lineCount = cachedByPath.lineCount;
-                    languageId = cachedByPath.languageId;
-                    if (fileIdentity && cachedByPath.fileIdentity !== fileIdentity) {
-                        cachedByPath.fileIdentity = fileIdentity;
-                        this.fileCacheByIdentity.set(fileIdentity, cachedByPath);
-                    }
-                }
-                else {
-                    const doc = await vscode.workspace.openTextDocument(uri);
-                    lineCount = doc.lineCount;
-                    languageId = doc.languageId;
-                    const entry = {
-                        mtime,
-                        lineCount,
-                        languageId,
-                        filePath: fileName,
-                        fileIdentity,
-                    };
-                    this.fileCacheByPath.set(normalizedPath, entry);
-                    if (fileIdentity) {
-                        this.fileCacheByIdentity.set(fileIdentity, entry);
-                    }
-                }
-            }
-            catch {
-                // Unreadable/binary/permission errors should not block the whole scan.
-                continue;
-            }
-            if (skippedLangs.has(languageId)) {
-                continue;
-            }
-            const ignoreEntry = await this.resolveIgnoreEntry(fileName, fileIdentity);
-            const threshold = this.getThreshold(languageId, fileName);
-            const effectiveThreshold = this.getEffectiveThreshold(ignoreEntry, threshold);
-            if (lineCount <= effectiveThreshold) {
-                continue;
-            }
-            if (this.isIgnoredEntry(ignoreEntry, lineCount)) {
-                continue;
-            }
-            results.push({
-                filePath: fileName,
-                fileName: path.basename(fileName),
-                languageId,
-                lineCount,
-                threshold: effectiveThreshold,
-                overage: lineCount - effectiveThreshold,
-            });
-        }
-        if (scannedCount < maxFiles) {
-            for (const [cachedPath] of this.fileCacheByPath.entries()) {
-                if (!seenPaths.has(cachedPath)) {
-                    this.fileCacheByPath.delete(cachedPath);
-                }
-            }
-            for (const [identity, entry] of this.fileCacheByIdentity.entries()) {
-                const entryPath = this.normalizeFilePath(entry.filePath);
-                if (!seenPaths.has(entryPath)) {
-                    this.fileCacheByIdentity.delete(identity);
-                }
-            }
-        }
-        this.saveFileCache();
-        this.lastScanAt = Date.now();
-        console.log('Scanning workspace...3');
-        // Sort: worst offenders first
-        results.sort((a, b) => b.overage - a.overage);
-        this.lastScanResults = results;
-        return results;
-    }
-    getScanGlobPatterns() {
-        // Build a list of extensions we care about based on configs.
-        // This avoids scanning node_modules and other huge directories by default.
-        const exts = new Set();
-        for (const cfg of this.configs) {
-            const ext = (cfg.extension || '').trim().toLowerCase();
-            if (!ext) {
-                continue;
-            }
-            if (!ext.startsWith('.')) {
-                continue;
-            }
-            if (ext === '.') {
-                continue;
-            }
-            exts.add(ext);
-        }
-        // If something goes wrong and we have no extensions, fall back to a sane subset.
-        if (exts.size === 0) {
-            for (const cfg of exports.DEFAULT_LANGUAGE_CONFIGS) {
-                exts.add(cfg.extension.toLowerCase());
-            }
-        }
-        // vscode globs: **/*.ts etc.
-        return Array.from(exts).map(ext => `**/*${ext}`);
-    }
-    getScanExcludeGlob() {
-        // Keep this conservative: exclude known large/noisy folders.
-        return '**/{node_modules,out,dist,build,coverage,.git,.vscode-test}/**';
+        const scan = await this.scanService.getOverThresholdFiles(this.lastScanAt, this.lastScanResults, force);
+        this.lastScanAt = scan.lastScanAt;
+        this.lastScanResults = scan.lastScanResults;
+        return scan.results;
     }
     async getDocumentByPath(filePath) {
-        const normalizedTarget = this.normalizeFilePath(filePath);
-        const openDoc = vscode.workspace.textDocuments.find(d => this.normalizeFilePath(d.fileName) === normalizedTarget);
-        if (openDoc) {
-            return openDoc;
+        const normalizedTarget = (0, fileTrackerPathUtils_1.normalizeFilePath)(filePath);
+        const openDocument = vscode.workspace.textDocuments.find(document => (0, fileTrackerPathUtils_1.normalizeFilePath)(document.fileName) === normalizedTarget);
+        if (openDocument) {
+            return openDocument;
         }
         try {
             return await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
