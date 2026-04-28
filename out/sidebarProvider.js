@@ -56,7 +56,7 @@ class SidebarProvider {
         this.bindMessages(webviewView.webview);
     }
     // ── Public API ────────────────────────────────────────────────────────────
-    refresh() {
+    refresh(force = false) {
         if (!this.view) {
             return;
         }
@@ -64,7 +64,7 @@ class SidebarProvider {
         if (this.refreshDebounce) {
             clearTimeout(this.refreshDebounce);
         }
-        this.refreshDebounce = setTimeout(() => this.pushState(), 150);
+        this.refreshDebounce = setTimeout(() => this.pushState(force), 150);
     }
     // ── Internal ──────────────────────────────────────────────────────────────
     async render() {
@@ -81,6 +81,7 @@ class SidebarProvider {
             configs: this.tracker.getConfigs(),
             scanSettings: this.tracker.getScanSettings(),
             isLoading: true,
+            loadingProgress: 0,
             promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
             promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
             batchPromptTemplate: this.tracker.getBatchPromptTemplate() || promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
@@ -103,12 +104,12 @@ class SidebarProvider {
             this.buildInFlight = undefined;
         }
         try {
-            const state = await this.buildState();
+            const state = await this.buildState(forceRebuild);
             if (!this.view || pushId !== this.statePushId) {
                 return;
             }
             this.updateBadge(state.files.length);
-            this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false } });
+            this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false, loadingProgress: 100 } });
         }
         catch (err) {
             if (!this.view || pushId !== this.statePushId) {
@@ -125,6 +126,7 @@ class SidebarProvider {
                     configs: this.tracker.getConfigs(),
                     scanSettings: this.tracker.getScanSettings(),
                     isLoading: false,
+                    loadingProgress: 100,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
                     batchPromptTemplate: this.tracker.getBatchPromptTemplate() || promptBuilder_1.DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
@@ -156,13 +158,13 @@ class SidebarProvider {
             tooltip: `${normalizedCount} refactor alert${normalizedCount === 1 ? '' : 's'}`,
         };
     }
-    async buildState() {
+    async buildState(forceRefresh = false) {
         // Coalesce concurrent refreshes into a single scan.
         if (!this.buildInFlight) {
             this.buildInFlight = (async () => {
                 console.log("Building state...");
                 const [files, configs] = await Promise.all([
-                    this.tracker.getOverThresholdFiles(),
+                    this.tracker.getOverThresholdFiles(forceRefresh),
                     Promise.resolve(this.tracker.getConfigs()),
                 ]);
                 return {

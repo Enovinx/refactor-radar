@@ -18,6 +18,7 @@ export interface WebviewState {
     ignoredFolders: string[];
   };
   isLoading: boolean;
+  loadingProgress: number;
   promptTemplate: string;
   promptVariables: string[];
   batchPromptTemplate: string;
@@ -117,8 +118,21 @@ export function getWebviewContent(state: WebviewState, script: string): string {
       list-style: none;
       cursor: pointer;
       padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .alert-summary::-webkit-details-marker { display: none; }
+
+    .alert-chevron {
+      margin-left: auto;
+      color: var(--vscode-descriptionForeground);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    details.file-card[open] .alert-chevron {
+      transform: rotate(90deg);
+    }
 
     .file-meta {
       display: flex;
@@ -572,6 +586,32 @@ export function getWebviewContent(state: WebviewState, script: string): string {
       margin-bottom: 6px;
     }
 
+    .loading-progress {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 2px;
+    }
+
+    .loading-progress-track {
+      width: min(220px, 68vw);
+      height: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+      overflow: hidden;
+      margin-top: 2px;
+    }
+
+    .loading-progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--vscode-button-background), var(--vscode-focusBorder, #007fd4));
+      width: 0%;
+      transition: width 160ms linear;
+    }
+
     .loading-puzzle {
       display: inline-grid;
       place-items: center;
@@ -613,6 +653,17 @@ export function getWebviewContent(state: WebviewState, script: string): string {
     .loading-message {
       color: var(--vscode-descriptionForeground);
       margin-bottom: 8px;
+      background: linear-gradient(90deg, var(--vscode-descriptionForeground) 0%, var(--vscode-foreground) 50%, var(--vscode-descriptionForeground) 100%);
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: loading-shine 2.1s linear infinite;
+    }
+
+    @keyframes loading-shine {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
 
     .loading-state.visible {

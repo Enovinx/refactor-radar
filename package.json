@@ -71,6 +71,11 @@
           "type": "number",
           "default": 300,
           "description": "Default line threshold for file types not explicitly configured."
+        },
+        "refactorRadar.refreshIntervalMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "Minimum time between workspace refresh scans in milliseconds."
         }
       }
     }

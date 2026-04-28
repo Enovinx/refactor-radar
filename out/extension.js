@@ -52,7 +52,7 @@ function activate(context) {
     console.log('Refactor Radar: activated');
     // ── Refresh command ───────────────────────────────────────────────────────
     context.subscriptions.push(vscode.commands.registerCommand('refactorRadar.refresh', () => {
-        sidebar.refresh();
+        sidebar.refresh(true);
     }));
     // ── Copy prompt for current file (command palette / keybinding) ───────────
     context.subscriptions.push(vscode.commands.registerCommand('refactorRadar.copyPromptForFile', async () => {

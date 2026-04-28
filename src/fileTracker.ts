@@ -37,6 +37,14 @@ export interface IgnoredFile {
   bonusLines?: number;
 }
 
+interface FileCacheEntry {
+  mtime: number;
+  lineCount: number;
+  languageId: string;
+  filePath: string;
+  fileIdentity?: string;
+}
+
 export interface ScanSettings {
   ignoreGitIgnore: boolean;
   maxFilesToScan: number | null;
@@ -82,6 +90,10 @@ export class FileTracker {
     ignoredFolders: [],
   };
   private onChange: () => void;
+  private fileCacheByPath: Map<string, FileCacheEntry> = new Map();
+  private fileCacheByIdentity: Map<string, FileCacheEntry> = new Map();
+  private lastScanAt = 0;
+  private lastScanResults: TrackedFile[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -90,6 +102,7 @@ export class FileTracker {
     this.onChange = onChange;
     this.loadConfigs();
     this.loadIgnoredFiles();
+    this.loadFileCache();
     this.loadPromptTemplate();
     this.loadBatchPromptTemplate();
     this.loadScanSettings();
@@ -140,9 +153,23 @@ export class FileTracker {
     this.ignoreMap = new Map(Object.entries(saved));
   }
 
+  private loadFileCache() {
+    const saved = this.context.workspaceState.get<{ byPath?: Record<string, FileCacheEntry>; byIdentity?: Record<string, FileCacheEntry> }>('fileCache', {});
+    this.fileCacheByPath = new Map(Object.entries(saved.byPath || {}));
+    this.fileCacheByIdentity = new Map(Object.entries(saved.byIdentity || {}));
+  }
+
   private saveIgnoredFiles() {
     const serialized = Object.fromEntries(this.ignoreMap.entries());
     this.context.workspaceState.update('ignoredFiles', serialized);
+  }
+
+  private saveFileCache() {
+    const serialized = {
+      byPath: Object.fromEntries(this.fileCacheByPath.entries()),
+      byIdentity: Object.fromEntries(this.fileCacheByIdentity.entries()),
+    };
+    this.context.workspaceState.update('fileCache', serialized);
   }
 
   saveConfigs() {
@@ -290,7 +317,7 @@ export class FileTracker {
   // ── Ignore state ──────────────────────────────────────────────────────────
 
   async ignoreForLines(filePath: string, currentLines: number, extraLines: number) {
-    const fileIdentity = await this.getFileIdentityFromPath(filePath);
+    const fileIdentity = (await this.getFileStats(filePath))?.fileIdentity;
     this.ignoreMap.set(this.normalizeFilePath(filePath), {
       kind: 'lines',
       untilLines: currentLines + extraLines,
@@ -303,7 +330,7 @@ export class FileTracker {
   }
 
   async ignoreForever(filePath: string) {
-    const fileIdentity = await this.getFileIdentityFromPath(filePath);
+    const fileIdentity = (await this.getFileStats(filePath))?.fileIdentity;
     this.ignoreMap.set(this.normalizeFilePath(filePath), {
       kind: 'forever',
       originalFilePath: filePath,
@@ -369,20 +396,30 @@ export class FileTracker {
     return baseThreshold;
   }
 
-  private async getFileIdentityFromPath(filePath: string): Promise<string | undefined> {
+  private getStatIdentity(stats: fs.Stats | fs.BigIntStats): string {
+    const scheme = process.platform === 'win32' ? 'win-fileid' : 'posix-inode';
+    const dev = (stats as fs.BigIntStats).dev;
+    const ino = (stats as fs.BigIntStats).ino;
+    const devString = typeof dev === 'bigint' ? dev.toString() : String(dev);
+    const inoString = typeof ino === 'bigint' ? ino.toString() : String(ino);
+    return `${scheme}:${devString}:${inoString}`;
+  }
+
+  private async getFileStats(filePath: string): Promise<{ mtime: number; fileIdentity?: string } | undefined> {
     try {
       const stats = await fs.promises.stat(filePath, { bigint: true });
-      const scheme = process.platform === 'win32' ? 'win-fileid' : 'posix-inode';
-      return `${scheme}:${stats.dev.toString()}:${stats.ino.toString()}`;
+      const mtimeRaw = (stats as fs.BigIntStats).mtimeMs;
+      const mtime = typeof mtimeRaw === 'bigint' ? Number(mtimeRaw) : mtimeRaw;
+      const fileIdentity = this.getStatIdentity(stats);
+      return { mtime, fileIdentity };
     } catch {
       return undefined;
     }
   }
 
-  private async resolveIgnoreEntry(fileName: string): Promise<IgnoreEntry | undefined> {
+  private async resolveIgnoreEntry(fileName: string, fileIdentity?: string): Promise<IgnoreEntry | undefined> {
     const normalizedPath = this.normalizeFilePath(fileName);
     const directEntry = this.ignoreMap.get(normalizedPath);
-    const fileIdentity = await this.getFileIdentityFromPath(fileName);
 
     if (directEntry) {
       let changed = false;
@@ -420,8 +457,6 @@ export class FileTracker {
   }
 
   // ── File scanning ─────────────────────────────────────────────────────────
-
-  private fileCache = new Map<string, { mtime: number, lineCount: number, languageId: string }>();
 
   private normalizeFolderPath(folder: string): string {
     return folder
@@ -481,8 +516,13 @@ export class FileTracker {
     return ignored;
   }
 
-  async getOverThresholdFiles(): Promise<TrackedFile[]> {
+  async getOverThresholdFiles(force = false): Promise<TrackedFile[]> {
     console.log('Scanning workspace...');
+    const refreshInterval = vscode.workspace.getConfiguration('refactorRadar').get<number>('refreshIntervalMs', 5000);
+    const now = Date.now();
+    if (!force && this.lastScanAt > 0 && now - this.lastScanAt < refreshInterval) {
+      return this.lastScanResults;
+    }
     const results: TrackedFile[] = [];
     const skippedSchemes = new Set(['git', 'output', 'debug', 'search-editor']);
     const skippedLangs = new Set(['markdown', 'plaintext', 'json', 'jsonc', 'log']);
@@ -526,6 +566,7 @@ export class FileTracker {
     const maxFiles = this.scanSettings.maxFilesToScan ?? Number.POSITIVE_INFINITY;
     let scannedCount = 0;
     const ignoredFolderSet = new Set(this.scanSettings.ignoredFolders.map(folder => this.normalizeFolderPath(folder)));
+    const seenPaths = new Set<string>();
 
     for (const uri of uniqueFiles) {
       if (scannedCount >= maxFiles) { break; }
@@ -542,21 +583,51 @@ export class FileTracker {
 
       let lineCount: number;
       let languageId: string;
+      let fileIdentity: string | undefined;
       const fileName = uri.fsPath;
+      const normalizedPath = this.normalizeFilePath(fileName);
+      seenPaths.add(normalizedPath);
 
       try {
-        const stat = await vscode.workspace.fs.stat(uri);
-        const cacheKey = uri.toString();
-        const cached = this.fileCache.get(cacheKey);
+        const stats = await this.getFileStats(fileName);
+        if (!stats) { continue; }
+        const { mtime, fileIdentity: statIdentity } = stats;
+        fileIdentity = statIdentity;
 
-        if (cached && cached.mtime === stat.mtime) {
-          lineCount = cached.lineCount;
-          languageId = cached.languageId;
+        const cachedByIdentity = fileIdentity ? this.fileCacheByIdentity.get(fileIdentity) : undefined;
+        const cachedByPath = this.fileCacheByPath.get(normalizedPath);
+
+        if (cachedByIdentity && cachedByIdentity.mtime === mtime) {
+          lineCount = cachedByIdentity.lineCount;
+          languageId = cachedByIdentity.languageId;
+          if (cachedByIdentity.filePath !== fileName) {
+            const oldPath = this.normalizeFilePath(cachedByIdentity.filePath);
+            this.fileCacheByPath.delete(oldPath);
+            cachedByIdentity.filePath = fileName;
+            this.fileCacheByPath.set(normalizedPath, cachedByIdentity);
+          }
+        } else if (cachedByPath && cachedByPath.mtime === mtime) {
+          lineCount = cachedByPath.lineCount;
+          languageId = cachedByPath.languageId;
+          if (fileIdentity && cachedByPath.fileIdentity !== fileIdentity) {
+            cachedByPath.fileIdentity = fileIdentity;
+            this.fileCacheByIdentity.set(fileIdentity, cachedByPath);
+          }
         } else {
           const doc = await vscode.workspace.openTextDocument(uri);
           lineCount = doc.lineCount;
           languageId = doc.languageId;
-          this.fileCache.set(cacheKey, { mtime: stat.mtime, lineCount, languageId });
+          const entry: FileCacheEntry = {
+            mtime,
+            lineCount,
+            languageId,
+            filePath: fileName,
+            fileIdentity,
+          };
+          this.fileCacheByPath.set(normalizedPath, entry);
+          if (fileIdentity) {
+            this.fileCacheByIdentity.set(fileIdentity, entry);
+          }
         }
       } catch {
         // Unreadable/binary/permission errors should not block the whole scan.
@@ -565,7 +636,7 @@ export class FileTracker {
 
       if (skippedLangs.has(languageId)) { continue; }
 
-      const ignoreEntry = await this.resolveIgnoreEntry(fileName);
+      const ignoreEntry = await this.resolveIgnoreEntry(fileName, fileIdentity);
       const threshold = this.getThreshold(languageId, fileName);
       const effectiveThreshold = this.getEffectiveThreshold(ignoreEntry, threshold);
 
@@ -582,10 +653,28 @@ export class FileTracker {
       });
     }
 
+    if (scannedCount < maxFiles) {
+      for (const [cachedPath] of this.fileCacheByPath.entries()) {
+        if (!seenPaths.has(cachedPath)) {
+          this.fileCacheByPath.delete(cachedPath);
+        }
+      }
+      for (const [identity, entry] of this.fileCacheByIdentity.entries()) {
+        const entryPath = this.normalizeFilePath(entry.filePath);
+        if (!seenPaths.has(entryPath)) {
+          this.fileCacheByIdentity.delete(identity);
+        }
+      }
+    }
+
+    this.saveFileCache();
+    this.lastScanAt = Date.now();
+
     console.log('Scanning workspace...3');
 
     // Sort: worst offenders first
     results.sort((a, b) => b.overage - a.overage);
+    this.lastScanResults = results;
     return results;
   }
 
