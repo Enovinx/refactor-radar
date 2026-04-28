@@ -1,9 +1,8 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { DEFAULT_LANGUAGE_CONFIGS } from './fileTrackerDefaults';
-import { FileTrackerIgnoreService } from './fileTrackerIgnore';
-import { normalizeFilePath, normalizeFolderPath } from './fileTrackerPathUtils';
-import { FileTrackerScanService } from './fileTrackerScan';
+import { FileTrackerIgnoreService } from './fileTracking/fileTrackerIgnore';
+import { normalizeFilePath, normalizeFolderPath } from './fileTracking/fileTrackerPathUtils';
+import { FileTrackerScanService } from './fileTracking/fileTrackerScan';
 import {
   loadBatchPromptTemplate,
   loadConfigs,
@@ -17,7 +16,7 @@ import {
   saveIgnoredFiles,
   savePromptTemplate,
   saveScanSettings,
-} from './fileTrackerStorage';
+} from './fileTracking/fileTrackerStorage';
 import {
   FileCacheEntry,
   IgnoreEntry,
@@ -25,10 +24,10 @@ import {
   LanguageConfig,
   ScanSettings,
   TrackedFile,
-} from './fileTrackerTypes';
+} from './fileTracking/fileTrackerTypes';
 
-export { LanguageConfig, TrackedFile, IgnoreEntry, IgnoredFile, ScanSettings } from './fileTrackerTypes';
-export { DEFAULT_LANGUAGE_CONFIGS } from './fileTrackerDefaults';
+export { LanguageConfig, TrackedFile, IgnoreEntry, IgnoredFile, ScanSettings } from './fileTracking/fileTrackerTypes';
+export { DEFAULT_LANGUAGE_CONFIGS } from './fileTracking/fileTrackerDefaults';
 
 export class FileTracker {
   private configs: LanguageConfig[];
