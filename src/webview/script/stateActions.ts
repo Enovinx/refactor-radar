@@ -66,6 +66,7 @@ interface ScanSettings {
   ignoredFolders: string[];
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;
+  expandFoldersOnToggle: boolean;
 }
 
 interface Msg {
@@ -83,6 +84,7 @@ let state: WebviewState = {
     ignoredFolders: [],
     hideFolders: false,
     hideFoldersWhileSearching: true,
+    expandFoldersOnToggle: true,
   },
   workspaceRoot: null,
   isLoading: true,
@@ -249,6 +251,22 @@ function expandFoldersForFile(filePath: string) {
   }
 }
 
+function expandFolderTree(folderPath: string) {
+  const normalized = normalizeRelativePath(folderPath);
+  if (!normalized) {
+    return;
+  }
+  const folderPrefix = normalized + '/';
+  const allFiles = state.files;
+  for (const file of allFiles) {
+    const relative = getWorkspaceRelativePath(file.filePath);
+    if (relative === normalized || relative.startsWith(folderPrefix)) {
+      expandFoldersForFile(file.filePath);
+      state2.expandedFolders.add(normalized);
+    }
+  }
+}
+
 const actions = {
   openFile: (filePath: string) => emit({ type: 'openFile', filePath }),
   ignoreForLines: (filePath: string, lineCount: number) => {
@@ -342,7 +360,11 @@ const actions = {
     if (state2.expandedFolders.has(folderPath)) {
       state2.expandedFolders.delete(folderPath);
     } else {
-      state2.expandedFolders.add(folderPath);
+      if (state.scanSettings.expandFoldersOnToggle) {
+        expandFolderTree(folderPath);
+      } else {
+        state2.expandedFolders.add(folderPath);
+      }
     }
     renderRoot();
   },
@@ -375,6 +397,11 @@ const actions = {
     state.scanSettings.hideFoldersWhileSearching = enabled;
     renderRoot();
     emit({ type: 'updateHideFoldersWhileSearching', enabled });
+  },
+  updateExpandFoldersOnToggle: (enabled: boolean) => {
+    state.scanSettings.expandFoldersOnToggle = enabled;
+    renderRoot();
+    emit({ type: 'updateExpandFoldersOnToggle', enabled });
   },
   addIgnoredFolder: () => {
     const folderInput = document.getElementById('new-folder') as HTMLInputElement | null;

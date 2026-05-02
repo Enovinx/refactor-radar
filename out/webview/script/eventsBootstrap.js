@@ -139,6 +139,11 @@ function onClick(e) {
             actions.updateHideFoldersWhileSearching(Boolean(checkbox.checked));
             break;
         }
+        case 'toggleExpandFoldersOnToggle': {
+            const checkbox = actionEl;
+            actions.updateExpandFoldersOnToggle(Boolean(checkbox.checked));
+            break;
+        }
         case 'savePromptTemplate':
             actions.savePromptTemplate();
             break;

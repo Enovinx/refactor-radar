@@ -45,4 +45,5 @@ export interface ScanSettings {
   ignoredFolders: string[];
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;
+  expandFoldersOnToggle: boolean;
 }

@@ -335,6 +335,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        case 'updateExpandFoldersOnToggle': {
+          this.tracker.updateExpandFoldersOnToggle(Boolean(msg.enabled));
+          void this.pushState(true);
+          break;
+        }
+
         case 'addIgnoredFolder': {
           this.tracker.addIgnoredFolder(String(msg.folder || ''));
           this.tracker.removeFolderFromLastScan(String(msg.folder || ''));

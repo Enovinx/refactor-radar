@@ -147,6 +147,11 @@ function onClick(e: MouseEvent) {
       actions.updateHideFoldersWhileSearching(Boolean(checkbox.checked));
       break;
     }
+    case 'toggleExpandFoldersOnToggle': {
+      const checkbox = actionEl as HTMLInputElement;
+      actions.updateExpandFoldersOnToggle(Boolean(checkbox.checked));
+      break;
+    }
     case 'savePromptTemplate':
       actions.savePromptTemplate();
       break;
@@ -220,6 +225,13 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
+function onDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest('.custom-dropdown')) {
+    document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+  }
+}
+
 window.addEventListener('beforeunload', () => {
   if (loadingMessageTimer !== undefined) {
     window.clearInterval(loadingMessageTimer);
@@ -248,5 +260,7 @@ if (root) {
   root.addEventListener('input', onInput);
   root.addEventListener('keydown', onKeyDown);
 }
+
+document.addEventListener('click', onDocumentClick, true);
 
 renderRoot();

@@ -48,6 +48,7 @@ function loadScanSettings(context) {
             : [],
         hideFolders: saved.hideFolders ?? false,
         hideFoldersWhileSearching: saved.hideFoldersWhileSearching ?? true,
+        expandFoldersOnToggle: saved.expandFoldersOnToggle ?? true,
     };
 }
 function saveScanSettings(context, scanSettings) {

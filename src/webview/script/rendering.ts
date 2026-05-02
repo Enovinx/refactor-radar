@@ -255,6 +255,10 @@ const render = {
         '<input type="checkbox" id="toggle-hidefolders-searching" data-action="toggleHideFoldersWhileSearching" ' + (state.scanSettings.hideFoldersWhileSearching ? 'checked' : '') + ' />' +
         'Hide folders when searching' +
       '</label>' +
+      '<label class="scan-checkbox-row">' +
+        '<input type="checkbox" id="toggle-expand-folders" data-action="toggleExpandFoldersOnToggle" ' + (state.scanSettings.expandFoldersOnToggle ? 'checked' : '') + ' />' +
+        'Expand all nested folders on toggle' +
+      '</label>' +
       '<label class="scan-field-label">Max files to scan (blank = unlimited)</label>' +
       '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
     '</div>';

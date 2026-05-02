@@ -21,6 +21,7 @@ let state = {
         ignoredFolders: [],
         hideFolders: false,
         hideFoldersWhileSearching: true,
+        expandFoldersOnToggle: true,
     },
     workspaceRoot: null,
     isLoading: true,
@@ -165,6 +166,21 @@ function expandFoldersForFile(filePath) {
         state2.expandedFolders.add(current);
     }
 }
+function expandFolderTree(folderPath) {
+    const normalized = normalizeRelativePath(folderPath);
+    if (!normalized) {
+        return;
+    }
+    const folderPrefix = normalized + '/';
+    const allFiles = state.files;
+    for (const file of allFiles) {
+        const relative = getWorkspaceRelativePath(file.filePath);
+        if (relative === normalized || relative.startsWith(folderPrefix)) {
+            expandFoldersForFile(file.filePath);
+            state2.expandedFolders.add(normalized);
+        }
+    }
+}
 const actions = {
     openFile: (filePath) => emit({ type: 'openFile', filePath }),
     ignoreForLines: (filePath, lineCount) => {
@@ -261,7 +277,12 @@ const actions = {
             state2.expandedFolders.delete(folderPath);
         }
         else {
-            state2.expandedFolders.add(folderPath);
+            if (state.scanSettings.expandFoldersOnToggle) {
+                expandFolderTree(folderPath);
+            }
+            else {
+                state2.expandedFolders.add(folderPath);
+            }
         }
         renderRoot();
     },
@@ -294,6 +315,11 @@ const actions = {
         state.scanSettings.hideFoldersWhileSearching = enabled;
         renderRoot();
         emit({ type: 'updateHideFoldersWhileSearching', enabled });
+    },
+    updateExpandFoldersOnToggle: (enabled) => {
+        state.scanSettings.expandFoldersOnToggle = enabled;
+        renderRoot();
+        emit({ type: 'updateExpandFoldersOnToggle', enabled });
     },
     addIgnoredFolder: () => {
         const folderInput = document.getElementById('new-folder');
@@ -835,6 +861,10 @@ const render = {
             '<input type="checkbox" id="toggle-hidefolders-searching" data-action="toggleHideFoldersWhileSearching" ' + (state.scanSettings.hideFoldersWhileSearching ? 'checked' : '') + ' />' +
             'Hide folders when searching' +
             '</label>' +
+            '<label class="scan-checkbox-row">' +
+            '<input type="checkbox" id="toggle-expand-folders" data-action="toggleExpandFoldersOnToggle" ' + (state.scanSettings.expandFoldersOnToggle ? 'checked' : '') + ' />' +
+            'Expand all nested folders on toggle' +
+            '</label>' +
             '<label class="scan-field-label">Max files to scan (blank = unlimited)</label>' +
             '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
             '</div>';
@@ -1040,6 +1070,11 @@ function onClick(e) {
         case 'toggleHideFoldersWhileSearching': {
             const checkbox = actionEl;
             actions.updateHideFoldersWhileSearching(Boolean(checkbox.checked));
+            break;
+        }
+        case 'toggleExpandFoldersOnToggle': {
+            const checkbox = actionEl;
+            actions.updateExpandFoldersOnToggle(Boolean(checkbox.checked));
             break;
         }
         case 'savePromptTemplate':

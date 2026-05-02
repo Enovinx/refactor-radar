@@ -40,6 +40,7 @@ export class FileTracker {
     ignoredFolders: [],
     hideFolders: false,
     hideFoldersWhileSearching: true,
+    expandFoldersOnToggle: true,
   };
   private fileCacheByPath: Map<string, FileCacheEntry>;
   private fileCacheByIdentity: Map<string, FileCacheEntry>;
@@ -150,6 +151,12 @@ export class FileTracker {
 
   updateHideFoldersWhileSearching(enabled: boolean): void {
     this.scanSettings.hideFoldersWhileSearching = enabled;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateExpandFoldersOnToggle(enabled: boolean): void {
+    this.scanSettings.expandFoldersOnToggle = enabled;
     saveScanSettings(this.context, this.scanSettings);
     this.onChange();
   }

@@ -109,12 +109,15 @@ export const WEBVIEW_STYLES = String.raw`
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
       margin-bottom: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
     }
     details.file-card[open] .file-stats {
       margin-bottom: 6px;
     }
-    .file-stats span { margin-right: 10px; }
-    .overage { color: #e05050; font-weight: 600; }
+    .file-stats span { margin-right: 0; }
+    .overage { color: #e05050; font-weight: 600; white-space: nowrap; }
 
     .file-actions {
       display: flex;

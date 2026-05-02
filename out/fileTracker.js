@@ -52,6 +52,7 @@ class FileTracker {
             ignoredFolders: [],
             hideFolders: false,
             hideFoldersWhileSearching: true,
+            expandFoldersOnToggle: true,
         };
         this.lastScanAt = 0;
         this.lastScanResults = [];
@@ -125,6 +126,11 @@ class FileTracker {
     }
     updateHideFoldersWhileSearching(enabled) {
         this.scanSettings.hideFoldersWhileSearching = enabled;
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
+        this.onChange();
+    }
+    updateExpandFoldersOnToggle(enabled) {
+        this.scanSettings.expandFoldersOnToggle = enabled;
         (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
         this.onChange();
     }
