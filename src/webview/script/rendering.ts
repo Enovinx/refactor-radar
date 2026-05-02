@@ -166,11 +166,14 @@ const render = {
     '<div class="section-body ' + (collapsed.files ? 'collapsed' : '') + '">' +
       '<div class="alerts-toolbar">' +
         '<input type="text" id="alerts-search" class="alerts-search" placeholder="Search alerts..." value="' + utils.escHtml(state2.alertsSearch) + '" />' +
-        '<div class="dropdown-container">' +
-          '<select id="alerts-sort" class="custom-select alerts-sort">' +
-            '<option value="overageDesc"' + (state2.alertsSort === 'overageDesc' ? ' selected' : '') + '>Most over first</option>' +
-            '<option value="overageAsc"' + (state2.alertsSort === 'overageAsc' ? ' selected' : '') + '>Least over first</option>' +
-          '</select>' +
+        '<div class="dropdown-container custom-dropdown" data-id="alerts-sort">' +
+          '<div class="custom-select" tabindex="0">' + 
+            (state2.alertsSort === 'overageDesc' ? 'Most over first' : 'Least over first') + 
+          '</div>' +
+          '<div class="dropdown-menu">' +
+            '<div class="dropdown-item' + (state2.alertsSort === 'overageDesc' ? ' selected' : '') + '" data-value="overageDesc">Most over first</div>' +
+            '<div class="dropdown-item' + (state2.alertsSort === 'overageAsc' ? ' selected' : '') + '" data-value="overageAsc">Least over first</div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       (filteredFiles.length === 0
@@ -180,12 +183,16 @@ const render = {
 
     const configTabs = '<div class="settings-mode">' +
       '<label class="settings-mode-label" for="configs-section">Settings section</label>' +
-      '<div class="dropdown-container">' +
-        '<select id="configs-section" class="custom-select settings-mode-select">' +
-          '<option value="language"' + (state2.configsSubTab === 'language' ? ' selected' : '') + '>Language thresholds</option>' +
-          '<option value="ignore"' + (state2.configsSubTab === 'ignore' ? ' selected' : '') + '>Ignored files</option>' +
-          '<option value="scan"' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '>Scanning</option>' +
-        '</select>' +
+      '<div class="dropdown-container custom-dropdown" data-id="configs-section">' +
+        '<div class="custom-select" tabindex="0">' + 
+          (state2.configsSubTab === 'language' ? 'Language thresholds' : 
+           state2.configsSubTab === 'ignore' ? 'Ignored files' : 'Scanning') + 
+        '</div>' +
+        '<div class="dropdown-menu">' +
+          '<div class="dropdown-item' + (state2.configsSubTab === 'language' ? ' selected' : '') + '" data-value="language">Language thresholds</div>' +
+          '<div class="dropdown-item' + (state2.configsSubTab === 'ignore' ? ' selected' : '') + '" data-value="ignore">Ignored files</div>' +
+          '<div class="dropdown-item' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '" data-value="scan">Scanning</div>' +
+        '</div>' +
       '</div>' +
     '</div>';
 

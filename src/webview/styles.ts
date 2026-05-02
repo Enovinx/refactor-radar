@@ -370,7 +370,7 @@ export const WEBVIEW_STYLES = String.raw`
       position: relative;
       width: 100%;
     }
-    
+
     .custom-select {
       appearance: none;
       width: 100%;
@@ -399,22 +399,66 @@ export const WEBVIEW_STYLES = String.raw`
       border-color: var(--vscode-focusBorder);
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
     }
-    
+
     .dropdown-container::after {
-      content: '▾';
+      content: '';
       position: absolute;
       top: 50%;
       right: 12px;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--vscode-descriptionForeground);
       transform: translateY(-50%);
       pointer-events: none;
-      font-size: 14px;
-      color: var(--vscode-descriptionForeground);
-      transition: transform 0.2s ease, color 0.2s ease;
+      transition: transform 0.2s ease, border-top-color 0.2s ease;
     }
     
     .dropdown-container:focus-within::after {
       transform: translateY(-50%) rotate(180deg);
-      color: var(--vscode-focusBorder);
+      border-top-color: var(--vscode-focusBorder);
+    }
+
+    /* Custom Dropdown Menu */
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      width: 100%;
+      background: var(--vscode-dropdown-background);
+      border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border));
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      padding: 4px;
+      animation: fadeInSlide 0.15s ease-out;
+    }
+
+    .dropdown-container.open .dropdown-menu {
+      display: flex;
+    }
+
+    .dropdown-item {
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--vscode-dropdown-foreground);
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s;
+    }
+
+    .dropdown-item:hover {
+      background: var(--vscode-list-hoverBackground);
+      color: var(--vscode-list-hoverForeground);
+    }
+
+    .dropdown-item.selected {
+      background: var(--vscode-list-activeSelectionBackground);
+      color: var(--vscode-list-activeSelectionForeground);
     }
 
     /* --- Animations --- */

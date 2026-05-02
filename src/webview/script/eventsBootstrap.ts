@@ -1,5 +1,40 @@
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
+
+  // Handle Custom Dropdown
+  const customDropdown = target?.closest('.custom-dropdown') as HTMLElement | null;
+  const dropdownItem = target?.closest('.dropdown-item') as HTMLElement | null;
+
+  if (customDropdown && !dropdownItem) {
+    // Toggle dropdown
+    const wasOpen = customDropdown.classList.contains('open');
+    // Close all other dropdowns
+    document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+    if (!wasOpen) {
+      customDropdown.classList.add('open');
+    }
+    e.stopPropagation();
+    return;
+  }
+
+  if (dropdownItem && customDropdown) {
+    const value = dropdownItem.dataset.value;
+    const dropdownId = customDropdown.dataset.id;
+    if (value && dropdownId) {
+      if (dropdownId === 'alerts-sort') {
+        actions.updateAlertsSort(value);
+      } else if (dropdownId === 'configs-section') {
+        actions.updateConfigsSection(value);
+      }
+    }
+    customDropdown.classList.remove('open');
+    e.stopPropagation();
+    return;
+  }
+
+  // Close dropdowns when clicking elsewhere
+  document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+
   const actionEl = target?.closest('[data-action]') as HTMLElement | null;
   if (!actionEl) { return; }
 
