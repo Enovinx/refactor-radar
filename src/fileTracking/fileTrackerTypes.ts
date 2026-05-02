@@ -43,4 +43,6 @@ export interface ScanSettings {
   ignoreGitIgnore: boolean;
   maxFilesToScan: number | null;
   ignoredFolders: string[];
+  hideFolders: boolean;
+  hideFoldersWhileSearching: boolean;
 }

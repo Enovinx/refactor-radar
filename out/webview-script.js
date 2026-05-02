@@ -19,6 +19,8 @@ let state = {
         ignoreGitIgnore: true,
         maxFilesToScan: null,
         ignoredFolders: [],
+        hideFolders: false,
+        hideFoldersWhileSearching: true,
     },
     workspaceRoot: null,
     isLoading: true,
@@ -260,6 +262,16 @@ const actions = {
         state.scanSettings.maxFilesToScan = maxFilesToScan;
         renderRoot();
         emit({ type: 'updateMaxFilesToScan', maxFilesToScan });
+    },
+    updateHideFolders: (enabled) => {
+        state.scanSettings.hideFolders = enabled;
+        renderRoot();
+        emit({ type: 'updateHideFolders', enabled });
+    },
+    updateHideFoldersWhileSearching: (enabled) => {
+        state.scanSettings.hideFoldersWhileSearching = enabled;
+        renderRoot();
+        emit({ type: 'updateHideFoldersWhileSearching', enabled });
     },
     addIgnoredFolder: () => {
         const folderInput = document.getElementById('new-folder');
@@ -706,10 +718,12 @@ const render = {
             return b.overage - a.overage;
         });
         const folderTree = buildFolderTree(filteredFiles);
-        const folderMarkup = folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(render.folderNode)
-            .join('');
+        const folderMarkup = (state.scanSettings.hideFolders || (state.scanSettings.hideFoldersWhileSearching && !!alertsSearch))
+            ? filteredFiles.map(render.fileCard).join('')
+            : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(render.folderNode)
+                .join('');
         const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
             '<span>Files Over Threshold</span>' +
             (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '') +
@@ -737,12 +751,12 @@ const render = {
             '<div class="dropdown-container custom-dropdown" data-id="configs-section">' +
             '<div class="custom-select" tabindex="0">' +
             (state2.configsSubTab === 'language' ? 'Language thresholds' :
-                state2.configsSubTab === 'ignore' ? 'Ignored files' : 'Scanning') +
+                state2.configsSubTab === 'ignore' ? 'Ignored files' : 'General') +
             '</div>' +
             '<div class="dropdown-menu">' +
             '<div class="dropdown-item' + (state2.configsSubTab === 'language' ? ' selected' : '') + '" data-value="language">Language thresholds</div>' +
             '<div class="dropdown-item' + (state2.configsSubTab === 'ignore' ? ' selected' : '') + '" data-value="ignore">Ignored files</div>' +
-            '<div class="dropdown-item' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '" data-value="scan">Scanning</div>' +
+            '<div class="dropdown-item' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '" data-value="scan">General</div>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -785,6 +799,14 @@ const render = {
             '<label class="scan-checkbox-row">' +
             '<input type="checkbox" id="toggle-gitignore" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
             'Ignore files listed in .gitignore' +
+            '</label>' +
+            '<label class="scan-checkbox-row">' +
+            '<input type="checkbox" id="toggle-hidefolders" data-action="toggleHideFolders" ' + (state.scanSettings.hideFolders ? 'checked' : '') + ' />' +
+            'Hide folders' +
+            '</label>' +
+            '<label class="scan-checkbox-row">' +
+            '<input type="checkbox" id="toggle-hidefolders-searching" data-action="toggleHideFoldersWhileSearching" ' + (state.scanSettings.hideFoldersWhileSearching ? 'checked' : '') + ' />' +
+            'Hide folders when searching' +
             '</label>' +
             '<label class="scan-field-label">Max files to scan (blank = unlimited)</label>' +
             '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
@@ -982,6 +1004,16 @@ function onClick(e) {
         case 'toggleGitIgnore': {
             const checkbox = actionEl;
             actions.updateIgnoreGitIgnore(Boolean(checkbox.checked));
+            break;
+        }
+        case 'toggleHideFolders': {
+            const checkbox = actionEl;
+            actions.updateHideFolders(Boolean(checkbox.checked));
+            break;
+        }
+        case 'toggleHideFoldersWhileSearching': {
+            const checkbox = actionEl;
+            actions.updateHideFoldersWhileSearching(Boolean(checkbox.checked));
             break;
         }
         case 'savePromptTemplate':

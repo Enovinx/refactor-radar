@@ -43,6 +43,8 @@ export function loadScanSettings(context: vscode.ExtensionContext): ScanSettings
     ignoredFolders: Array.isArray(saved.ignoredFolders)
       ? saved.ignoredFolders.filter(Boolean).map(folder => normalizeFolderPath(folder))
       : [],
+    hideFolders: saved.hideFolders ?? false,
+    hideFoldersWhileSearching: saved.hideFoldersWhileSearching ?? true,
   };
 }
 

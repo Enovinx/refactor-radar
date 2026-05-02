@@ -34,7 +34,13 @@ export class FileTracker {
   private ignoreMap: Map<string, IgnoreEntry>;
   private promptTemplate: string;
   private batchPromptTemplate: string;
-  private scanSettings: ScanSettings;
+  private scanSettings: ScanSettings = {
+    ignoreGitIgnore: true,
+    maxFilesToScan: null,
+    ignoredFolders: [],
+    hideFolders: false,
+    hideFoldersWhileSearching: true,
+  };
   private fileCacheByPath: Map<string, FileCacheEntry>;
   private fileCacheByIdentity: Map<string, FileCacheEntry>;
   private lastScanAt = 0;
@@ -53,7 +59,10 @@ export class FileTracker {
     this.fileCacheByIdentity = cache.byIdentity;
     this.promptTemplate = loadPromptTemplate(context);
     this.batchPromptTemplate = loadBatchPromptTemplate(context);
-    this.scanSettings = loadScanSettings(context);
+    this.scanSettings = {
+      ...this.scanSettings,
+      ...loadScanSettings(context)
+    };
 
     this.ignoreService = new FileTrackerIgnoreService(
       this.ignoreMap,
@@ -129,6 +138,18 @@ export class FileTracker {
 
   updateMaxFilesToScan(value: number | null): void {
     this.scanSettings.maxFilesToScan = value && value > 0 ? Math.floor(value) : null;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateHideFolders(enabled: boolean): void {
+    this.scanSettings.hideFolders = enabled;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateHideFoldersWhileSearching(enabled: boolean): void {
+    this.scanSettings.hideFoldersWhileSearching = enabled;
     saveScanSettings(this.context, this.scanSettings);
     this.onChange();
   }

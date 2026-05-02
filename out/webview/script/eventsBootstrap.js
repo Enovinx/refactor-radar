@@ -130,6 +130,16 @@ function onClick(e) {
             actions.updateIgnoreGitIgnore(Boolean(checkbox.checked));
             break;
         }
+        case 'toggleHideFolders': {
+            const checkbox = actionEl;
+            actions.updateHideFolders(Boolean(checkbox.checked));
+            break;
+        }
+        case 'toggleHideFoldersWhileSearching': {
+            const checkbox = actionEl;
+            actions.updateHideFoldersWhileSearching(Boolean(checkbox.checked));
+            break;
+        }
         case 'savePromptTemplate':
             actions.savePromptTemplate();
             break;

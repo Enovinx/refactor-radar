@@ -46,6 +46,13 @@ class FileTracker {
     constructor(context, onChange) {
         this.context = context;
         this.onChange = onChange;
+        this.scanSettings = {
+            ignoreGitIgnore: true,
+            maxFilesToScan: null,
+            ignoredFolders: [],
+            hideFolders: false,
+            hideFoldersWhileSearching: true,
+        };
         this.lastScanAt = 0;
         this.lastScanResults = [];
         this.configs = (0, fileTrackerStorage_1.loadConfigs)(context);
@@ -55,7 +62,10 @@ class FileTracker {
         this.fileCacheByIdentity = cache.byIdentity;
         this.promptTemplate = (0, fileTrackerStorage_1.loadPromptTemplate)(context);
         this.batchPromptTemplate = (0, fileTrackerStorage_1.loadBatchPromptTemplate)(context);
-        this.scanSettings = (0, fileTrackerStorage_1.loadScanSettings)(context);
+        this.scanSettings = {
+            ...this.scanSettings,
+            ...(0, fileTrackerStorage_1.loadScanSettings)(context)
+        };
         this.ignoreService = new fileTrackerIgnore_1.FileTrackerIgnoreService(this.ignoreMap, () => (0, fileTrackerStorage_1.saveIgnoredFiles)(this.context, this.ignoreMap), this.onChange);
         this.scanService = new fileTrackerScan_1.FileTrackerScanService(this.ignoreService, () => this.configs, () => this.scanSettings, (languageIdOrDoc, fileName) => this.getThreshold(languageIdOrDoc, fileName), this.fileCacheByPath, this.fileCacheByIdentity, () => (0, fileTrackerStorage_1.saveFileCache)(this.context, this.fileCacheByPath, this.fileCacheByIdentity));
     }
@@ -105,6 +115,16 @@ class FileTracker {
     }
     updateMaxFilesToScan(value) {
         this.scanSettings.maxFilesToScan = value && value > 0 ? Math.floor(value) : null;
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
+        this.onChange();
+    }
+    updateHideFolders(enabled) {
+        this.scanSettings.hideFolders = enabled;
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
+        this.onChange();
+    }
+    updateHideFoldersWhileSearching(enabled) {
+        this.scanSettings.hideFoldersWhileSearching = enabled;
         (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
         this.onChange();
     }

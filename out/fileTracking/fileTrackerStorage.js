@@ -46,6 +46,8 @@ function loadScanSettings(context) {
         ignoredFolders: Array.isArray(saved.ignoredFolders)
             ? saved.ignoredFolders.filter(Boolean).map(folder => (0, fileTrackerPathUtils_1.normalizeFolderPath)(folder))
             : [],
+        hideFolders: saved.hideFolders ?? false,
+        hideFoldersWhileSearching: saved.hideFoldersWhileSearching ?? true,
     };
 }
 function saveScanSettings(context, scanSettings) {

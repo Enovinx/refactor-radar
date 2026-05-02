@@ -19,6 +19,8 @@ let state = {
         ignoreGitIgnore: true,
         maxFilesToScan: null,
         ignoredFolders: [],
+        hideFolders: false,
+        hideFoldersWhileSearching: true,
     },
     workspaceRoot: null,
     isLoading: true,
@@ -260,6 +262,16 @@ const actions = {
         state.scanSettings.maxFilesToScan = maxFilesToScan;
         renderRoot();
         emit({ type: 'updateMaxFilesToScan', maxFilesToScan });
+    },
+    updateHideFolders: (enabled) => {
+        state.scanSettings.hideFolders = enabled;
+        renderRoot();
+        emit({ type: 'updateHideFolders', enabled });
+    },
+    updateHideFoldersWhileSearching: (enabled) => {
+        state.scanSettings.hideFoldersWhileSearching = enabled;
+        renderRoot();
+        emit({ type: 'updateHideFoldersWhileSearching', enabled });
     },
     addIgnoredFolder: () => {
         const folderInput = document.getElementById('new-folder');
