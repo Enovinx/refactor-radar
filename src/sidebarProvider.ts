@@ -10,7 +10,7 @@ import {
   DEFAULT_REFACTOR_PROMPT_TEMPLATE,
   PROMPT_TEMPLATE_VARIABLES,
 } from './promptBuilder';
-import { getWebviewContent } from './webview';
+import { getWebviewContent } from './webview/index';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
