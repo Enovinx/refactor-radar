@@ -38,7 +38,7 @@ const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const promptBuilder_1 = require("./promptBuilder");
-const webview_1 = require("./webview");
+const index_1 = require("./webview/index");
 class SidebarProvider {
     constructor(tracker) {
         this.tracker = tracker;
@@ -75,7 +75,7 @@ class SidebarProvider {
         // Avoid stale Activity Bar badges while a new scan is in flight.
         this.updateBadge(0);
         const script = fs.readFileSync(path.join(__dirname, 'webview-script.js'), 'utf-8');
-        this.view.webview.html = (0, webview_1.getWebviewContent)({
+        this.view.webview.html = (0, index_1.getWebviewContent)({
             files: [],
             ignoredFiles: this.tracker.getIgnoredFiles(),
             configs: this.tracker.getConfigs(),

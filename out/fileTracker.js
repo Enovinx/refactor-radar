@@ -36,11 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FileTracker = exports.DEFAULT_LANGUAGE_CONFIGS = void 0;
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
-const fileTrackerIgnore_1 = require("./fileTrackerIgnore");
-const fileTrackerPathUtils_1 = require("./fileTrackerPathUtils");
-const fileTrackerScan_1 = require("./fileTrackerScan");
-const fileTrackerStorage_1 = require("./fileTrackerStorage");
-var fileTrackerDefaults_1 = require("./fileTrackerDefaults");
+const fileTrackerIgnore_1 = require("./fileTracking/fileTrackerIgnore");
+const fileTrackerPathUtils_1 = require("./fileTracking/fileTrackerPathUtils");
+const fileTrackerScan_1 = require("./fileTracking/fileTrackerScan");
+const fileTrackerStorage_1 = require("./fileTracking/fileTrackerStorage");
+var fileTrackerDefaults_1 = require("./fileTracking/fileTrackerDefaults");
 Object.defineProperty(exports, "DEFAULT_LANGUAGE_CONFIGS", { enumerable: true, get: function () { return fileTrackerDefaults_1.DEFAULT_LANGUAGE_CONFIGS; } });
 class FileTracker {
     constructor(context, onChange) {
