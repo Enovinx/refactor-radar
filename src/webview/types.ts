@@ -17,6 +17,7 @@ export interface WebviewState {
     maxFilesToScan: number | null;
     ignoredFolders: string[];
   };
+  workspaceRoot: string | null;
   isLoading: boolean;
   loadingProgress: number;
   promptTemplate: string;

@@ -184,14 +184,11 @@ interface FolderNode {
 }
 
 function normalizeFolderSegments(filePath: string): string[] {
-  const normalized = filePath.replace(/\\/g, '/');
-  const parts = normalized
+  const relative = getWorkspaceRelativePath(filePath);
+  const parts = relative
     .split('/')
     .filter(Boolean)
     .filter(segment => segment !== '.' && segment !== '..');
-  if (parts.length > 0 && /^[a-zA-Z]:$/.test(parts[0])) {
-    return parts.slice(1, Math.max(1, parts.length - 1));
-  }
   return parts.slice(0, Math.max(0, parts.length - 1));
 }
 
@@ -234,6 +231,9 @@ function buildFolderTree(files: TrackedFile[]): FolderNode {
   const root: FolderNode = { name: '', path: '', files: [], children: new Map(), alertCount: 0 };
   const normalizedSegments = files.map(file => normalizeFolderSegments(file.filePath));
   const prefixLength = getCommonPrefixLength(normalizedSegments);
+  const prefixPath = normalizedSegments.length > 0
+    ? normalizedSegments[0].slice(0, prefixLength).join('/')
+    : '';
 
   for (let index = 0; index < files.length; index++) {
     const file = files[index];
@@ -242,10 +242,11 @@ function buildFolderTree(files: TrackedFile[]): FolderNode {
     let runningPath = '';
     for (const segment of segments) {
       runningPath = runningPath ? runningPath + '/' + segment : segment;
+      const fullPath = prefixPath ? prefixPath + '/' + runningPath : runningPath;
       if (!current.children.has(segment)) {
         current.children.set(segment, {
           name: segment,
-          path: runningPath,
+          path: fullPath,
           files: [],
           children: new Map(),
           alertCount: 0,

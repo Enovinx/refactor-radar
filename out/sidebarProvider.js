@@ -80,6 +80,7 @@ class SidebarProvider {
             ignoredFiles: this.tracker.getIgnoredFiles(),
             configs: this.tracker.getConfigs(),
             scanSettings: this.tracker.getScanSettings(),
+            workspaceRoot: this.tracker.getWorkspaceRoot(),
             isLoading: true,
             loadingProgress: 0,
             promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
@@ -125,6 +126,7 @@ class SidebarProvider {
                     ignoredFiles: this.tracker.getIgnoredFiles(),
                     configs: this.tracker.getConfigs(),
                     scanSettings: this.tracker.getScanSettings(),
+                    workspaceRoot: this.tracker.getWorkspaceRoot(),
                     isLoading: false,
                     loadingProgress: 100,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
@@ -172,6 +174,7 @@ class SidebarProvider {
                     ignoredFiles: this.tracker.getIgnoredFiles(),
                     configs,
                     scanSettings: this.tracker.getScanSettings(),
+                    workspaceRoot: this.tracker.getWorkspaceRoot(),
                     isLoading: false,
                     promptTemplate: this.tracker.getPromptTemplate() || promptBuilder_1.DEFAULT_REFACTOR_PROMPT_TEMPLATE,
                     promptVariables: promptBuilder_1.PROMPT_TEMPLATE_VARIABLES,
@@ -253,14 +256,16 @@ class SidebarProvider {
                 case 'ignoreForLines': {
                     void (async () => {
                         await this.tracker.ignoreForLines(msg.filePath, msg.lineCount, msg.extra);
-                        await this.pushState(true);
+                        this.tracker.removeFileFromLastScan(msg.filePath);
+                        await this.pushState(false);
                     })();
                     break;
                 }
                 case 'ignoreForever': {
                     void (async () => {
                         await this.tracker.ignoreForever(msg.filePath);
-                        await this.pushState(true);
+                        this.tracker.removeFileFromLastScan(msg.filePath);
+                        await this.pushState(false);
                     })();
                     break;
                 }
@@ -302,7 +307,8 @@ class SidebarProvider {
                 }
                 case 'addIgnoredFolder': {
                     this.tracker.addIgnoredFolder(String(msg.folder || ''));
-                    void this.pushState(true);
+                    this.tracker.removeFolderFromLastScan(String(msg.folder || ''));
+                    void this.pushState(false);
                     break;
                 }
                 case 'removeIgnoredFolder': {

@@ -20,6 +20,7 @@ let state = {
         maxFilesToScan: null,
         ignoredFolders: [],
     },
+    workspaceRoot: null,
     isLoading: true,
     loadingProgress: 0,
     promptTemplate: '',
@@ -29,6 +30,10 @@ let state = {
     defaultBatchPromptTemplate: '',
     defaultPromptTemplate: '',
 };
+const initialState = window.__STATE__;
+if (initialState) {
+    state = initialState;
+}
 const state2 = {
     collapsed: { files: false, settings: false },
     activeTab: 'alerts',
@@ -46,6 +51,35 @@ let loadingMessageTimer;
 let loadingProgressTimer;
 let loadingPuzzle = createLoadingPuzzle();
 const emit = (msg) => vscode.postMessage(msg);
+function normalizeRelativePath(value) {
+    return value
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '');
+}
+function normalizeAbsolutePath(value) {
+    const normalized = value.replace(/\\/g, '/');
+    return /^[a-zA-Z]:/.test(normalized) ? normalized.toLowerCase() : normalized;
+}
+function getWorkspaceRelativePath(filePath) {
+    const rootPath = state.workspaceRoot;
+    if (!rootPath) {
+        return normalizeRelativePath(filePath);
+    }
+    const normalizedRoot = normalizeAbsolutePath(rootPath).replace(/\/+$/, '');
+    const normalizedFile = normalizeAbsolutePath(filePath);
+    if (normalizedFile === normalizedRoot) {
+        return '';
+    }
+    if (normalizedFile.startsWith(normalizedRoot + '/')) {
+        return normalizeRelativePath(normalizedFile.slice(normalizedRoot.length + 1));
+    }
+    if (normalizedFile.startsWith(normalizedRoot)) {
+        return normalizeRelativePath(normalizedFile.slice(normalizedRoot.length));
+    }
+    return normalizeRelativePath(normalizedFile);
+}
 function restoreIgnoredFileToAlerts(filePath) {
     const ignoredFile = state.ignoredFiles.find(f => f.filePath === filePath);
     if (ignoredFile && ignoredFile.cachedLineCount !== undefined && ignoredFile.cachedThreshold !== undefined) {
@@ -104,12 +138,15 @@ function removePredictedCustomConfig(languageId) {
     state.configs = state.configs.filter(cfg => !(cfg.languageId === languageId && cfg.isCustom));
 }
 function removePredictedIgnoredFolder(folderPath) {
-    const normalized = folderPath.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+    const normalized = normalizeRelativePath(folderPath);
     if (!normalized) {
         return;
     }
     const prefix = normalized + '/';
-    state.files = state.files.filter(file => file.filePath !== normalized && !file.filePath.startsWith(prefix));
+    state.files = state.files.filter(file => {
+        const relativePath = getWorkspaceRelativePath(file.filePath);
+        return relativePath !== normalized && !relativePath.startsWith(prefix);
+    });
     state2.expandedFolders.delete(normalized);
     if (state2.activeFolderPrompt && (state2.activeFolderPrompt === normalized || state2.activeFolderPrompt.startsWith(prefix))) {
         state2.activeFolderPrompt = null;
@@ -230,7 +267,7 @@ const actions = {
         if (!folderInput || !errEl) {
             return;
         }
-        const folder = folderInput.value.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        const folder = normalizeRelativePath(folderInput.value);
         errEl.textContent = '';
         if (!folder) {
             errEl.textContent = 'Enter a folder path.';
@@ -246,7 +283,7 @@ const actions = {
         emit({ type: 'addIgnoredFolder', folder });
     },
     ignoreFolder: (folderPath) => {
-        const normalized = folderPath.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        const normalized = normalizeRelativePath(folderPath);
         if (!normalized) {
             return;
         }

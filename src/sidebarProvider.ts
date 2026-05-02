@@ -75,6 +75,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       ignoredFiles: this.tracker.getIgnoredFiles(),
       configs: this.tracker.getConfigs(),
       scanSettings: this.tracker.getScanSettings(),
+      workspaceRoot: this.tracker.getWorkspaceRoot(),
       isLoading: true,
       loadingProgress: 0,
       promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
@@ -116,6 +117,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           ignoredFiles: this.tracker.getIgnoredFiles(),
           configs: this.tracker.getConfigs(),
           scanSettings: this.tracker.getScanSettings(),
+          workspaceRoot: this.tracker.getWorkspaceRoot(),
           isLoading: false,
           loadingProgress: 100,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
@@ -165,6 +167,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           ignoredFiles: this.tracker.getIgnoredFiles(),
           configs,
           scanSettings: this.tracker.getScanSettings(),
+          workspaceRoot: this.tracker.getWorkspaceRoot(),
           isLoading: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
@@ -262,7 +265,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'ignoreForLines': {
           void (async () => {
             await this.tracker.ignoreForLines(msg.filePath, msg.lineCount, msg.extra);
-            await this.pushState(true);
+            this.tracker.removeFileFromLastScan(msg.filePath);
+            await this.pushState(false);
           })();
           break;
         }
@@ -270,7 +274,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'ignoreForever': {
           void (async () => {
             await this.tracker.ignoreForever(msg.filePath);
-            await this.pushState(true);
+            this.tracker.removeFileFromLastScan(msg.filePath);
+            await this.pushState(false);
           })();
           break;
         }
@@ -320,7 +325,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         case 'addIgnoredFolder': {
           this.tracker.addIgnoredFolder(String(msg.folder || ''));
-          void this.pushState(true);
+          this.tracker.removeFolderFromLastScan(String(msg.folder || ''));
+          void this.pushState(false);
           break;
         }
 

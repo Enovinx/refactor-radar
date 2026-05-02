@@ -74,6 +74,10 @@ class FileTracker {
     getScanSettings() {
         return this.scanSettings;
     }
+    getWorkspaceRoot() {
+        const root = vscode.workspace.workspaceFolders?.[0];
+        return root ? root.uri.fsPath : null;
+    }
     setPromptTemplate(template) {
         this.promptTemplate = template;
         (0, fileTrackerStorage_1.savePromptTemplate)(this.context, this.promptTemplate);
@@ -179,6 +183,25 @@ class FileTracker {
     }
     async ignoreForever(filePath) {
         await this.ignoreService.ignoreForever(filePath);
+    }
+    removeFileFromLastScan(filePath) {
+        const normalizedTarget = (0, fileTrackerPathUtils_1.normalizeFilePath)(filePath);
+        this.lastScanResults = this.lastScanResults.filter(file => (0, fileTrackerPathUtils_1.normalizeFilePath)(file.filePath) !== normalizedTarget);
+    }
+    removeFolderFromLastScan(folder) {
+        const normalizedFolder = (0, fileTrackerPathUtils_1.normalizeFolderPath)(folder);
+        if (!normalizedFolder) {
+            return;
+        }
+        const root = this.getWorkspaceRoot();
+        if (!root) {
+            return;
+        }
+        const prefix = `${normalizedFolder}/`;
+        this.lastScanResults = this.lastScanResults.filter(file => {
+            const relativePath = (0, fileTrackerPathUtils_1.normalizeFolderPath)(path.relative(root, file.filePath));
+            return relativePath !== normalizedFolder && !relativePath.startsWith(prefix);
+        });
     }
     unignore(filePath) {
         this.ignoreService.unignore(filePath);

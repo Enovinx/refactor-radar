@@ -365,18 +365,108 @@ export const WEBVIEW_STYLES = String.raw`
     .configs-search {
       width: 100%;
     }
+    /* --- Dropdown Polishing --- */
+    .dropdown-container {
+      position: relative;
+      width: 100%;
+    }
+    
+    .custom-select {
+      appearance: none;
+      width: 100%;
+      height: 32px;
+      padding: 0 32px 0 10px;
+      font-family: var(--vscode-font-family);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border, transparent);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .custom-select:hover {
+      background: var(--vscode-input-background);
+      border-color: var(--vscode-focusBorder);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    
+    .custom-select:focus {
+      border-color: var(--vscode-focusBorder);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
+    }
+    
+    .dropdown-container::after {
+      content: '▾';
+      position: absolute;
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
+      pointer-events: none;
+      font-size: 14px;
+      color: var(--vscode-descriptionForeground);
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+    
+    .dropdown-container:focus-within::after {
+      transform: translateY(-50%) rotate(180deg);
+      color: var(--vscode-focusBorder);
+    }
+
+    /* --- Animations --- */
+    @keyframes fadeInSlide {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .settings-body { 
+      padding: 8px 12px 10px; 
+      animation: fadeInSlide 0.25s ease-out forwards;
+    }
+
     .settings-mode {
       padding: 10px 12px 0;
       display: grid;
-      gap: 4px;
+      gap: 6px;
     }
+
+    /* Ensure specific overrides for our new styled selects */
+    .settings-mode-select, .alerts-sort {
+      composes: custom-select;
+    }
+    
     .settings-mode-label {
       font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       color: var(--vscode-descriptionForeground);
+      margin-left: 2px;
+      margin-bottom: 2px;
     }
+
+    /* Existing overrides / additions */
+    select,
     .settings-mode-select {
-      width: 100%;
+      /* base style for any select we might have missed */
     }
+    
+    input[type="number"], input[type="text"], .prompt-template {
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    input[type="number"]:focus, input[type="text"]:focus, .prompt-template:focus {
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent);
+    }
+    
+    .section-body {
+      transition: max-height 0.3s ease-in-out;
+    }
+
 
     .error-msg {
       font-size: 11px;
@@ -487,7 +577,7 @@ export const WEBVIEW_STYLES = String.raw`
       background: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
       border: 1px solid var(--vscode-input-border, transparent);
-      border-radius: 3px;
+      border-radius: 6px;
       padding: 3px 6px;
     }
     select:focus,
