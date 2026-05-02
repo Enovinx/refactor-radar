@@ -4,12 +4,18 @@
     "target": "ES2020",
     "outFile": "./out/webview-script.js",
     "rootDir": "./src",
-    "lib": ["ES2020", "DOM"],
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
     "types": [],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "removeComments": true
   },
-  "include": ["src/webview-script.ts"]
+  "include": [
+    "src/webview-script.ts",
+    "src/webview-script/**/*.ts"
+  ]
 }
