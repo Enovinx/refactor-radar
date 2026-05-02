@@ -1150,6 +1150,12 @@ function onKeyDown(e) {
         actions.addIgnoredFolder();
     }
 }
+function onDocumentClick(e) {
+    const target = e.target;
+    if (!target?.closest('.custom-dropdown')) {
+        document.querySelectorAll('.custom-dropdown.open').forEach(el => el.classList.remove('open'));
+    }
+}
 window.addEventListener('beforeunload', () => {
     if (loadingMessageTimer !== undefined) {
         window.clearInterval(loadingMessageTimer);
@@ -1176,4 +1182,5 @@ if (root) {
     root.addEventListener('input', onInput);
     root.addEventListener('keydown', onKeyDown);
 }
+document.addEventListener('click', onDocumentClick, true);
 renderRoot();
