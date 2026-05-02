@@ -27,7 +27,6 @@ function onClick(e: MouseEvent) {
         actions.updateConfigsSection(value);
       }
     }
-    customDropdown.classList.remove('open');
     e.stopPropagation();
     return;
   }

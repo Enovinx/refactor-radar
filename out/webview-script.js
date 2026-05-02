@@ -154,6 +154,17 @@ function removePredictedIgnoredFolder(folderPath) {
         state2.activeFolderPrompt = null;
     }
 }
+function expandFoldersForFile(filePath) {
+    const segments = normalizeFolderSegments(filePath);
+    if (segments.length === 0) {
+        return;
+    }
+    let current = '';
+    for (const segment of segments) {
+        current = current ? current + '/' + segment : segment;
+        state2.expandedFolders.add(current);
+    }
+}
 const actions = {
     openFile: (filePath) => emit({ type: 'openFile', filePath }),
     ignoreForLines: (filePath, lineCount) => {
@@ -193,6 +204,9 @@ const actions = {
             return;
         }
         state2.activeFileCard = state2.activeFileCard === filePath ? null : filePath;
+        if (state2.activeFileCard && state2.alertsSearch.trim() && !state.scanSettings.hideFolders && state.scanSettings.hideFoldersWhileSearching) {
+            expandFoldersForFile(state2.activeFileCard);
+        }
         renderRoot();
     },
     addCustom: () => {
@@ -226,7 +240,15 @@ const actions = {
     },
     toggleSection: (name) => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },
     updateIgnoredSearch: (value) => { state2.ignoredSearch = value; renderRoot(); },
-    updateAlertsSearch: (value) => { state2.alertsSearch = value; renderRoot(); },
+    updateAlertsSearch: (value) => {
+        const previous = state2.alertsSearch.trim();
+        state2.alertsSearch = value;
+        const next = state2.alertsSearch.trim();
+        if (previous && !next && state2.activeFileCard && !state.scanSettings.hideFolders && state.scanSettings.hideFoldersWhileSearching) {
+            expandFoldersForFile(state2.activeFileCard);
+        }
+        renderRoot();
+    },
     updateAlertsSort: (value) => {
         state2.alertsSort = value === 'overageAsc' ? 'overageAsc' : 'overageDesc';
         renderRoot();
@@ -908,7 +930,6 @@ function onClick(e) {
                 actions.updateConfigsSection(value);
             }
         }
-        customDropdown.classList.remove('open');
         e.stopPropagation();
         return;
     }

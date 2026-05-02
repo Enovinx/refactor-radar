@@ -26,7 +26,6 @@ function onClick(e) {
                 actions.updateConfigsSection(value);
             }
         }
-        customDropdown.classList.remove('open');
         e.stopPropagation();
         return;
     }
