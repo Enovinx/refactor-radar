@@ -34,7 +34,12 @@ const render = {
             .map(child => render.folderNode(child))
             .join('');
         const fileMarkup = [...node.files]
-            .sort((a, b) => b.overage - a.overage)
+            .sort((a, b) => {
+            if (state2.alertsSort === 'overageAsc') {
+                return a.overage - b.overage;
+            }
+            return b.overage - a.overage;
+        })
             .map(render.fileCard)
             .join('');
         const allPaths = getAllNodePaths(node);

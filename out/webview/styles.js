@@ -376,12 +376,15 @@ exports.WEBVIEW_STYLES = String.raw `
 
     .custom-select {
       appearance: none;
+      display: flex;
+      align-items: center;
       width: 100%;
       height: 32px;
       padding: 0 32px 0 10px;
       font-family: var(--vscode-font-family);
       font-size: 11px;
       font-weight: 600;
+      line-height: 1;
       color: var(--vscode-foreground);
       background: var(--vscode-input-background);
       border: 1px solid var(--vscode-input-border, transparent);
