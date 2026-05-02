@@ -470,9 +470,8 @@ export const WEBVIEW_STYLES = String.raw`
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .settings-body { 
-      padding: 8px 12px 10px; 
-      animation: fadeInSlide 0.25s ease-out forwards;
+    .settings-body {
+      padding: 8px 12px 10px;
     }
 
     .settings-mode {

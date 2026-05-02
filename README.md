@@ -19,7 +19,7 @@ To install the extension from source, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Enovinx/refactor-rader
    cd refactor-radar
    ```
 
