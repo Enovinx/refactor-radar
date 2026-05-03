@@ -2,8 +2,8 @@
 node_modules/
 
 # Build output
-./out/
-./dist/
+out/
+dist/
 *.tsbuildinfo
 
 # VS Code extension packaging/testing
