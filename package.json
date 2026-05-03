@@ -2,12 +2,15 @@
   "name": "refactor-radar",
   "displayName": "Refactor Radar",
   "description": "Track file lengths, get warned when they bloat, and copy AI refactor prompts in one click.",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "publisher": "Enovinx",
   "engines": {
     "vscode": "^1.116.0"
   },
-  "repository": "https://github.com/enovinx/refactor-radar",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enovinx/refactor-radar"
+  },
   "categories": [
     "Other",
     "Linters"
