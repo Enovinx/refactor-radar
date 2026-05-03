@@ -1,4 +1,23 @@
 const render = {
+  sortTrackedFiles: (a: TrackedFile, b: TrackedFile): number => {
+    return render.sortTreeEntries(
+      { name: a.fileName, sortOverage: a.overage },
+      { name: b.fileName, sortOverage: b.overage }
+    );
+  },
+  sortTreeEntries: (
+    a: { name: string; sortOverage: number },
+    b: { name: string; sortOverage: number }
+  ): number => {
+    if (state2.alertsSort === 'overageAsc') {
+      if (a.sortOverage !== b.sortOverage) {
+        return a.sortOverage - b.sortOverage;
+      }
+    } else if (a.sortOverage !== b.sortOverage) {
+      return b.sortOverage - a.sortOverage;
+    }
+    return a.name.localeCompare(b.name);
+  },
   fileCard: (file: TrackedFile): string => {
     const { escHtml } = utils;
     const encodedPath = encodeURIComponent(file.filePath);
@@ -38,19 +57,21 @@ const render = {
     '</details>';
   },
   folderNode: (node: FolderNode): string => {
-    const childMarkup = Array.from(node.children.values())
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(child => render.folderNode(child))
-      .join('');
-    const fileMarkup = [...node.files]
-      .sort((a, b) => {
-        if (state2.alertsSort === 'overageAsc') {
-          return a.overage - b.overage;
-        }
-        return b.overage - a.overage;
-      })
-      .map(render.fileCard)
-      .join('');
+    const entries = [
+      ...Array.from(node.children.values()).map(child => ({
+        kind: 'folder' as const,
+        name: child.name,
+        sortOverage: child.overageTotal,
+        render: () => render.folderNode(child),
+      })),
+      ...node.files.map(file => ({
+        kind: 'file' as const,
+        name: file.fileName,
+        sortOverage: file.overage,
+        render: () => render.fileCard(file),
+      })),
+    ].sort(render.sortTreeEntries);
+    const childMarkup = entries.map(entry => entry.render()).join('');
     const allPaths = getAllNodePaths(node);
     const isExpanded = state2.expandedFolders.has(node.path);
     const showFolderPrompt = state2.activeFolderPrompt === node.path;
@@ -78,7 +99,7 @@ const render = {
             : '') +
         '</span>' +
       '</div>' +
-      '<div class="folder-children ' + (isExpanded ? '' : 'collapsed') + '">' + childMarkup + fileMarkup + '</div>' +
+      '<div class="folder-children ' + (isExpanded ? '' : 'collapsed') + '">' + childMarkup + '</div>' +
     '</div>';
   },
   thresholdRow: (cfg: LanguageConfig): string => {
@@ -163,19 +184,24 @@ const render = {
           file.filePath.toLowerCase().includes(alertsSearch)
         )
       : files;
-    const filteredFiles = [...searchedFiles].sort((a, b) => {
-      if (state2.alertsSort === 'overageAsc') {
-        return a.overage - b.overage;
-      }
-      return b.overage - a.overage;
-    });
+    const filteredFiles = [...searchedFiles].sort(render.sortTrackedFiles);
     const folderTree = buildFolderTree(filteredFiles);
     const folderMarkup = (state.scanSettings.hideFolders || (state.scanSettings.hideFoldersWhileSearching && !!alertsSearch))
-      ? filteredFiles.map(render.fileCard).join('')
-      : folderTree.files.map(render.fileCard).join('') + Array.from(folderTree.children.values())
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(render.folderNode)
-          .join('');
+      ? [...filteredFiles].sort(render.sortTrackedFiles).map(render.fileCard).join('')
+      : [
+          ...Array.from(folderTree.children.values()).map(child => ({
+            kind: 'folder' as const,
+            name: child.name,
+            sortOverage: child.overageTotal,
+            render: () => render.folderNode(child),
+          })),
+          ...folderTree.files.map(file => ({
+            kind: 'file' as const,
+            name: file.fileName,
+            sortOverage: file.overage,
+            render: () => render.fileCard(file),
+          })),
+        ].sort(render.sortTreeEntries).map(entry => entry.render()).join('');
 
     const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
       '<span>Files Over Threshold</span>' +

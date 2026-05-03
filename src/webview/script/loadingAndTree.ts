@@ -181,6 +181,7 @@ interface FolderNode {
   files: TrackedFile[];
   children: Map<string, FolderNode>;
   alertCount: number;
+  overageTotal: number;
 }
 
 function normalizeFolderSegments(filePath: string): string[] {
@@ -227,8 +228,15 @@ function computeAlertCounts(node: FolderNode): number {
   return node.alertCount;
 }
 
+function computeOverageTotals(node: FolderNode): number {
+  const childTotal = Array.from(node.children.values()).reduce((sum, child) => sum + computeOverageTotals(child), 0);
+  const fileTotal = node.files.reduce((sum, file) => sum + file.overage, 0);
+  node.overageTotal = fileTotal + childTotal;
+  return node.overageTotal;
+}
+
 function buildFolderTree(files: TrackedFile[]): FolderNode {
-  const root: FolderNode = { name: '', path: '', files: [], children: new Map(), alertCount: 0 };
+  const root: FolderNode = { name: '', path: '', files: [], children: new Map(), alertCount: 0, overageTotal: 0 };
   const normalizedSegments = files.map(file => normalizeFolderSegments(file.filePath));
   const prefixLength = getCommonPrefixLength(normalizedSegments);
   const prefixPath = normalizedSegments.length > 0
@@ -250,6 +258,7 @@ function buildFolderTree(files: TrackedFile[]): FolderNode {
           files: [],
           children: new Map(),
           alertCount: 0,
+          overageTotal: 0,
         });
       }
       current = current.children.get(segment)!;
@@ -258,6 +267,7 @@ function buildFolderTree(files: TrackedFile[]): FolderNode {
   }
 
   computeAlertCounts(root);
+  computeOverageTotals(root);
 
   return root;
 }

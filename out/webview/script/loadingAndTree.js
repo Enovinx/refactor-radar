@@ -186,8 +186,14 @@ function computeAlertCounts(node) {
     node.alertCount = node.files.length + childCount;
     return node.alertCount;
 }
+function computeOverageTotals(node) {
+    const childTotal = Array.from(node.children.values()).reduce((sum, child) => sum + computeOverageTotals(child), 0);
+    const fileTotal = node.files.reduce((sum, file) => sum + file.overage, 0);
+    node.overageTotal = fileTotal + childTotal;
+    return node.overageTotal;
+}
 function buildFolderTree(files) {
-    const root = { name: '', path: '', files: [], children: new Map(), alertCount: 0 };
+    const root = { name: '', path: '', files: [], children: new Map(), alertCount: 0, overageTotal: 0 };
     const normalizedSegments = files.map(file => normalizeFolderSegments(file.filePath));
     const prefixLength = getCommonPrefixLength(normalizedSegments);
     const prefixPath = normalizedSegments.length > 0
@@ -208,6 +214,7 @@ function buildFolderTree(files) {
                     files: [],
                     children: new Map(),
                     alertCount: 0,
+                    overageTotal: 0,
                 });
             }
             current = current.children.get(segment);
@@ -215,5 +222,6 @@ function buildFolderTree(files) {
         current.files.push(file);
     }
     computeAlertCounts(root);
+    computeOverageTotals(root);
     return root;
 }
