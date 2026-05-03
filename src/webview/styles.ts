@@ -89,6 +89,7 @@ export const WEBVIEW_STYLES = String.raw`
       align-items: center;
       gap: 6px;
       margin-bottom: 5px;
+      flex: 1;
       min-width: 0;
     }
     .file-name {
@@ -97,7 +98,8 @@ export const WEBVIEW_STYLES = String.raw`
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      flex: 0 1 auto;
+      word-break: normal;
+      flex: 1 1 auto;
       max-width: 100%;
       min-width: 0;
       cursor: pointer;
@@ -112,6 +114,17 @@ export const WEBVIEW_STYLES = String.raw`
       display: flex;
       flex-wrap: wrap;
       gap: 2px 10px;
+      flex-shrink: 0;
+    }
+    .alert-summary:hover .file-name {
+      overflow: visible;
+      text-overflow: clip;
+    }
+    .alert-summary:hover .file-stats span {
+      visibility: hidden;
+    }
+    .alert-summary:hover .file-stats .overage {
+      visibility: visible;
     }
     details.file-card[open] .file-stats {
       margin-bottom: 6px;

@@ -46,6 +46,8 @@ export function loadScanSettings(context: vscode.ExtensionContext): ScanSettings
     hideFolders: saved.hideFolders ?? false,
     hideFoldersWhileSearching: saved.hideFoldersWhileSearching ?? true,
     expandFoldersOnToggle: saved.expandFoldersOnToggle ?? true,
+    showLineCount: saved.showLineCount ?? true,
+    limitDisplayMode: saved.limitDisplayMode ?? 'customOnly',
   };
 }
 

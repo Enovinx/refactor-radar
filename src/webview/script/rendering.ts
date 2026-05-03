@@ -3,14 +3,24 @@ const render = {
     const { escHtml } = utils;
     const encodedPath = encodeURIComponent(file.filePath);
     const isActive = state2.activeFileCard === file.filePath;
+    const relativePath = getWorkspaceRelativePath(file.filePath);
+    const displayPath = relativePath || file.filePath;
+    const displayMode = state.scanSettings.limitDisplayMode || 'customOnly';
+    let showLimit = false;
+    if (displayMode === 'always') showLimit = true;
+    else if (displayMode === 'customOnly') showLimit = file.isCustomLimit;
+    else if (displayMode === 'off') showLimit = false;
+
+    const showLineCount = state.scanSettings.showLineCount !== false;
+
     return '<details class="file-card alert-node"' + (isActive ? ' open' : '') + '>' +
       '<summary class="alert-summary" data-action="toggleFileCard" data-file="' + escHtml(encodedPath) + '">' +
         '<div class="file-meta">' +
-          '<span class="file-name" title="' + escHtml(file.filePath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
+          '<span class="file-name" title="' + escHtml(displayPath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
         '</div>' +
         '<div class="file-stats">' +
-          '<span>' + file.lineCount + ' lines</span>' +
-          '<span>limit: ' + file.threshold + '</span>' +
+          (showLineCount ? '<span>' + file.lineCount + ' lines</span>' : '') +
+          (showLimit ? '<span>limit: ' + file.threshold + '</span>' : '') +
           '<span class="overage">+' + file.overage + ' over</span>' +
         '</div>' +
         '<span class="alert-chevron" aria-hidden="true">▸</span>' +
@@ -84,6 +94,8 @@ const render = {
     const { escHtml } = utils;
     const encodedPath = encodeURIComponent(file.filePath);
     const isForever = file.kind === 'forever';
+    const relativePath = getWorkspaceRelativePath(file.filePath);
+    const displayPath = relativePath || file.filePath;
     const details = isForever
       ? 'This file is hidden from alerts until you cancel permanent ignore.'
       : '+' + (file.bonusLines ?? 0) + ' lines applied (max ' + (file.untilLines ?? 0) + ' lines)';
@@ -93,7 +105,7 @@ const render = {
 
     return '<div class="file-card">' +
       '<div class="file-meta">' +
-        '<span class="file-name" title="' + escHtml(file.filePath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
+        '<span class="file-name" title="' + escHtml(displayPath) + '" data-action="openFile" data-file="' + escHtml(encodedPath) + '">' + escHtml(file.fileName) + '</span>' +
       '</div>' +
       '<div class="ignored-details">' + escHtml(details) + '</div>' +
       '<div class="file-actions">' +
@@ -233,7 +245,7 @@ const render = {
       (state.scanSettings.ignoredFolders.length === 0
         ? '<div class="empty-state">No ignored folders yet.</div>'
         : '<div>' + state.scanSettings.ignoredFolders.map(folder =>
-          '<div class="file-card"><div class="file-meta"><span class="file-name">' + utils.escHtml(folder) + '</span></div>' +
+          '<div class="file-card"><div class="file-meta"><span class="file-name" title="' + utils.escHtml(folder) + '">' + utils.escHtml(folder) + '</span></div>' +
           '<div class="file-actions"><button class="btn-primary btn-sm" data-action="removeFolder" data-folder="' + utils.escHtml(folder) + '">Remove</button></div></div>'
         ).join('') + '</div>') +
       (filteredIgnoredFiles.length === 0
@@ -259,7 +271,23 @@ const render = {
         '<input type="checkbox" id="toggle-expand-folders" data-action="toggleExpandFoldersOnToggle" ' + (state.scanSettings.expandFoldersOnToggle ? 'checked' : '') + ' />' +
         'Expand all nested folders on toggle' +
       '</label>' +
-      '<label class="scan-field-label">Max files to scan (blank = unlimited)</label>' +
+      '<label class="scan-checkbox-row">' +
+        '<input type="checkbox" id="toggle-show-line-count" data-action="toggleShowLineCount" ' + (state.scanSettings.showLineCount !== false ? 'checked' : '') + ' />' +
+        'Show line count on alerts' +
+      '</label>' +
+      '<label class="scan-field-label">Limit display mode</label>' +
+      '<div class="dropdown-container custom-dropdown" data-id="limit-display-mode">' +
+        '<div class="custom-select" tabindex="0">' +
+          (state.scanSettings.limitDisplayMode === 'always' ? 'Always on' :
+           state.scanSettings.limitDisplayMode === 'off' ? 'Off' : 'Custom limit only') +
+        '</div>' +
+        '<div class="dropdown-menu">' +
+          '<div class="dropdown-item' + (state.scanSettings.limitDisplayMode === 'customOnly' || !state.scanSettings.limitDisplayMode ? ' selected' : '') + '" data-value="customOnly">Custom limit only</div>' +
+          '<div class="dropdown-item' + (state.scanSettings.limitDisplayMode === 'off' ? ' selected' : '') + '" data-value="off">Off</div>' +
+          '<div class="dropdown-item' + (state.scanSettings.limitDisplayMode === 'always' ? ' selected' : '') + '" data-value="always">Always on</div>' +
+        '</div>' +
+      '</div>' +
+      '<label class="scan-field-label" style="margin-top: 12px;">Max files to scan (blank = unlimited)</label>' +
       '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
     '</div>';
 

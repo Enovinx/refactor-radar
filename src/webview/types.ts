@@ -1,4 +1,4 @@
-import { LanguageConfig, TrackedFile } from '../fileTracker';
+import { LanguageConfig, TrackedFile, ScanSettings } from '../fileTracker';
 
 export interface IgnoredFile {
   filePath: string;
@@ -12,11 +12,7 @@ export interface WebviewState {
   files: TrackedFile[];
   ignoredFiles: IgnoredFile[];
   configs: LanguageConfig[];
-  scanSettings: {
-    ignoreGitIgnore: boolean;
-    maxFilesToScan: number | null;
-    ignoredFolders: string[];
-  };
+  scanSettings: ScanSettings;
   workspaceRoot: string | null;
   isLoading: boolean;
   loadingProgress: number;

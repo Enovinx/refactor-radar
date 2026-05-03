@@ -13,6 +13,7 @@ export interface TrackedFile {
   lineCount: number;
   threshold: number;
   overage: number;
+  isCustomLimit: boolean;
 }
 
 export interface IgnoreEntry {
@@ -46,4 +47,6 @@ export interface ScanSettings {
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;
   expandFoldersOnToggle: boolean;
+  showLineCount: boolean;
+  limitDisplayMode: 'customOnly' | 'off' | 'always';
 }

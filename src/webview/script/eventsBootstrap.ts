@@ -25,6 +25,8 @@ function onClick(e: MouseEvent) {
         actions.updateAlertsSort(value);
       } else if (dropdownId === 'configs-section') {
         actions.updateConfigsSection(value);
+      } else if (dropdownId === 'limit-display-mode') {
+        actions.updateLimitDisplayMode(value as 'customOnly' | 'off' | 'always');
       }
     }
     e.stopPropagation();
@@ -150,6 +152,11 @@ function onClick(e: MouseEvent) {
     case 'toggleExpandFoldersOnToggle': {
       const checkbox = actionEl as HTMLInputElement;
       actions.updateExpandFoldersOnToggle(Boolean(checkbox.checked));
+      break;
+    }
+    case 'toggleShowLineCount': {
+      const checkbox = actionEl as HTMLInputElement;
+      actions.updateShowLineCount(Boolean(checkbox.checked));
       break;
     }
     case 'savePromptTemplate':

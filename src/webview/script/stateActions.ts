@@ -22,6 +22,7 @@ interface TrackedFile {
   lineCount: number;
   threshold: number;
   overage: number;
+  isCustomLimit: boolean;
 }
 
 interface LanguageConfig {
@@ -67,6 +68,8 @@ interface ScanSettings {
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;
   expandFoldersOnToggle: boolean;
+  showLineCount: boolean;
+  limitDisplayMode: 'customOnly' | 'off' | 'always';
 }
 
 interface Msg {
@@ -85,6 +88,8 @@ let state: WebviewState = {
     hideFolders: false,
     hideFoldersWhileSearching: true,
     expandFoldersOnToggle: true,
+    showLineCount: true,
+    limitDisplayMode: 'customOnly',
   },
   workspaceRoot: null,
   isLoading: true,
@@ -168,7 +173,8 @@ function restoreIgnoredFileToAlerts(filePath: string) {
       fileName: ignoredFile.fileName,
       lineCount: ignoredFile.cachedLineCount,
       threshold: ignoredFile.cachedThreshold,
-      overage: ignoredFile.cachedOverage || 0
+      overage: ignoredFile.cachedOverage || 0,
+      isCustomLimit: false
     }];
   }
 }
@@ -399,9 +405,19 @@ const actions = {
     emit({ type: 'updateHideFoldersWhileSearching', enabled });
   },
   updateExpandFoldersOnToggle: (enabled: boolean) => {
+    vscode.postMessage({ type: 'updateExpandFoldersOnToggle', enabled });
     state.scanSettings.expandFoldersOnToggle = enabled;
     renderRoot();
-    emit({ type: 'updateExpandFoldersOnToggle', enabled });
+  },
+  updateShowLineCount: (enabled: boolean) => {
+    vscode.postMessage({ type: 'updateShowLineCount', enabled });
+    state.scanSettings.showLineCount = enabled;
+    renderRoot();
+  },
+  updateLimitDisplayMode: (mode: 'customOnly' | 'off' | 'always') => {
+    vscode.postMessage({ type: 'updateLimitDisplayMode', mode });
+    state.scanSettings.limitDisplayMode = mode;
+    renderRoot();
   },
   addIgnoredFolder: () => {
     const folderInput = document.getElementById('new-folder') as HTMLInputElement | null;

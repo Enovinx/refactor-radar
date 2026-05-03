@@ -69,6 +69,7 @@ function activate(context) {
             lineCount: doc.lineCount,
             threshold,
             overage: Math.max(0, doc.lineCount - threshold),
+            isCustomLimit: false,
         };
         const prompt = (0, promptBuilder_1.buildRefactorPrompt)(file, doc.getText(), tracker.getPromptTemplate());
         await vscode.env.clipboard.writeText(prompt);

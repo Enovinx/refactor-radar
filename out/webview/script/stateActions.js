@@ -22,6 +22,8 @@ let state = {
         hideFolders: false,
         hideFoldersWhileSearching: true,
         expandFoldersOnToggle: true,
+        showLineCount: true,
+        limitDisplayMode: 'customOnly',
     },
     workspaceRoot: null,
     isLoading: true,
@@ -91,7 +93,8 @@ function restoreIgnoredFileToAlerts(filePath) {
                 fileName: ignoredFile.fileName,
                 lineCount: ignoredFile.cachedLineCount,
                 threshold: ignoredFile.cachedThreshold,
-                overage: ignoredFile.cachedOverage || 0
+                overage: ignoredFile.cachedOverage || 0,
+                isCustomLimit: false
             }];
     }
 }
@@ -317,9 +320,19 @@ const actions = {
         emit({ type: 'updateHideFoldersWhileSearching', enabled });
     },
     updateExpandFoldersOnToggle: (enabled) => {
+        vscode.postMessage({ type: 'updateExpandFoldersOnToggle', enabled });
         state.scanSettings.expandFoldersOnToggle = enabled;
         renderRoot();
-        emit({ type: 'updateExpandFoldersOnToggle', enabled });
+    },
+    updateShowLineCount: (enabled) => {
+        vscode.postMessage({ type: 'updateShowLineCount', enabled });
+        state.scanSettings.showLineCount = enabled;
+        renderRoot();
+    },
+    updateLimitDisplayMode: (mode) => {
+        vscode.postMessage({ type: 'updateLimitDisplayMode', mode });
+        state.scanSettings.limitDisplayMode = mode;
+        renderRoot();
     },
     addIgnoredFolder: () => {
         const folderInput = document.getElementById('new-folder');

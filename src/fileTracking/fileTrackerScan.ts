@@ -147,6 +147,33 @@ export class FileTrackerScanService {
         continue;
       }
 
+      let isCustomLimit = false;
+      const configs = this.getConfigs();
+      const byLanguage = configs.find(c => c.languageId === languageId);
+      if (byLanguage) {
+        if (byLanguage.isCustom) {
+          isCustomLimit = true;
+        } else {
+          const defaultCfg = DEFAULT_LANGUAGE_CONFIGS.find(c => c.languageId === languageId);
+          if (defaultCfg && byLanguage.lines !== defaultCfg.lines) {
+            isCustomLimit = true;
+          }
+        }
+      } else {
+        const ext = path.extname(fileName).toLowerCase();
+        const byExtension = configs.find(c => c.extension === ext);
+        if (byExtension) {
+          if (byExtension.isCustom) {
+            isCustomLimit = true;
+          } else {
+            const defaultCfg = DEFAULT_LANGUAGE_CONFIGS.find(c => c.extension === ext);
+            if (defaultCfg && byExtension.lines !== defaultCfg.lines) {
+              isCustomLimit = true;
+            }
+          }
+        }
+      }
+
       results.push({
         filePath: fileName,
         fileName: path.basename(fileName),
@@ -154,6 +181,7 @@ export class FileTrackerScanService {
         lineCount,
         threshold: effectiveThreshold,
         overage: lineCount - effectiveThreshold,
+        isCustomLimit,
       });
     }
 

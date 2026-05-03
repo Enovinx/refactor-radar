@@ -25,6 +25,9 @@ function onClick(e) {
             else if (dropdownId === 'configs-section') {
                 actions.updateConfigsSection(value);
             }
+            else if (dropdownId === 'limit-display-mode') {
+                actions.updateLimitDisplayMode(value);
+            }
         }
         e.stopPropagation();
         return;
@@ -142,6 +145,11 @@ function onClick(e) {
         case 'toggleExpandFoldersOnToggle': {
             const checkbox = actionEl;
             actions.updateExpandFoldersOnToggle(Boolean(checkbox.checked));
+            break;
+        }
+        case 'toggleShowLineCount': {
+            const checkbox = actionEl;
+            actions.updateShowLineCount(Boolean(checkbox.checked));
             break;
         }
         case 'savePromptTemplate':

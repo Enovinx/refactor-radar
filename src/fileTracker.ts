@@ -41,6 +41,8 @@ export class FileTracker {
     hideFolders: false,
     hideFoldersWhileSearching: true,
     expandFoldersOnToggle: true,
+    showLineCount: true,
+    limitDisplayMode: 'customOnly',
   };
   private fileCacheByPath: Map<string, FileCacheEntry>;
   private fileCacheByIdentity: Map<string, FileCacheEntry>;
@@ -157,6 +159,18 @@ export class FileTracker {
 
   updateExpandFoldersOnToggle(enabled: boolean): void {
     this.scanSettings.expandFoldersOnToggle = enabled;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateShowLineCount(enabled: boolean): void {
+    this.scanSettings.showLineCount = enabled;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateLimitDisplayMode(mode: 'customOnly' | 'off' | 'always'): void {
+    this.scanSettings.limitDisplayMode = mode;
     saveScanSettings(this.context, this.scanSettings);
     this.onChange();
   }

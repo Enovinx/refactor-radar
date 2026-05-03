@@ -53,6 +53,8 @@ class FileTracker {
             hideFolders: false,
             hideFoldersWhileSearching: true,
             expandFoldersOnToggle: true,
+            showLineCount: true,
+            limitDisplayMode: 'customOnly',
         };
         this.lastScanAt = 0;
         this.lastScanResults = [];
@@ -131,6 +133,16 @@ class FileTracker {
     }
     updateExpandFoldersOnToggle(enabled) {
         this.scanSettings.expandFoldersOnToggle = enabled;
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
+        this.onChange();
+    }
+    updateShowLineCount(enabled) {
+        this.scanSettings.showLineCount = enabled;
+        (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
+        this.onChange();
+    }
+    updateLimitDisplayMode(mode) {
+        this.scanSettings.limitDisplayMode = mode;
         (0, fileTrackerStorage_1.saveScanSettings)(this.context, this.scanSettings);
         this.onChange();
     }
