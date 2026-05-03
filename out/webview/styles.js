@@ -47,7 +47,7 @@ exports.WEBVIEW_STYLES = String.raw `
       margin-right: 4px;
     }
 
-    .section-body { overflow: hidden; }
+    .section-body { overflow: visible; }
     .section-body.collapsed { display: none; }
 
     .empty-state {
