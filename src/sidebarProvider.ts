@@ -51,6 +51,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  setBadgeCount(alertCount: number) {
+    this.updateBadge(alertCount);
+  }
+
   refresh(force = false) {
     if (!this.view) { return; }
     // Debounce rapid refreshes (e.g. on fast typing)

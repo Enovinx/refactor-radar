@@ -1,5 +1,7 @@
 # Refactor Radar
 
+![Promotional Image](promo/promoimage.png)
+
 Refactor Radar is a VS Code extension that monitors file lengths and provides structured AI prompts to assist with refactoring large files. It helps maintain code quality by alerting you when files exceed defined thresholds and simplifying the process of preparing code for AI analysis.
 
 ## Features
@@ -11,7 +13,7 @@ Refactor Radar is a VS Code extension that monitors file lengths and provides st
 
 ## Setup
 
-You can get our extension from our website: https://refactor-rader.netlify.app
+You can get the extension from the website: https://refactor-rader.netlify.app
 
 Otherwise if you want to modify it, you can install it from source:
 
