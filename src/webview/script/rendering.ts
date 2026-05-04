@@ -227,16 +227,15 @@ const render = {
     '</div>';
 
     const configTabs = '<div class="settings-mode">' +
-      '<label class="settings-mode-label" for="configs-section">Settings section</label>' +
       '<div class="dropdown-container custom-dropdown" data-id="configs-section">' +
       '<div class="custom-select" tabindex="0">' + 
-        (state2.configsSubTab === 'language' ? 'Language thresholds' : 
-         state2.configsSubTab === 'ignore' ? 'Ignored files' : 'General') + 
+        (state2.configsSubTab === 'scan' ? 'General Settings' : 
+         state2.configsSubTab === 'ignore' ? 'Ignored files' : 'Language thresholds') + 
       '</div>' +
       '<div class="dropdown-menu">' +
-        '<div class="dropdown-item' + (state2.configsSubTab === 'language' ? ' selected' : '') + '" data-value="language">Language thresholds</div>' +
+        '<div class="dropdown-item' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '" data-value="scan">General Settings</div>' +
         '<div class="dropdown-item' + (state2.configsSubTab === 'ignore' ? ' selected' : '') + '" data-value="ignore">Ignored files</div>' +
-        '<div class="dropdown-item' + (state2.configsSubTab === 'scan' ? ' selected' : '') + '" data-value="scan">General</div>' +
+        '<div class="dropdown-item' + (state2.configsSubTab === 'language' ? ' selected' : '') + '" data-value="language">Language thresholds</div>' +
       '</div>' +
       '</div>' +
     '</div>';
@@ -261,13 +260,13 @@ const render = {
       '<div class="ignored-toolbar ignored-toolbar-compact">' +
         '<input type="text" id="ignored-search" class="ignored-search" placeholder="Search ignored files..." value="' + utils.escHtml(state2.ignoredSearch) + '" />' +
       '</div>' +
-      '<p class="settings-description">Manage ignored files and folders from one place.</p>' +
+      '<p class="settings-description"> </p>' +
       '<div class="add-custom-row settings-row-spaced">' +
-        '<input type="text" id="new-folder" class="folder-input" placeholder="folder/path" />' +
+        '<input type="text" id="new-folder" class="folder-input" placeholder="./folder  (Relative to project root)" />' +
         '<button class="btn-primary" data-action="addFolder">Add Folder</button>' +
       '</div>' +
       '<p id="folder-error" class="error-msg"></p>' +
-      '<div class="ignored-note ignored-note-compact">Ignored folders are relative to workspace root.</div>' +
+      '<div class="ignored-note ignored-note-compact"> </div>' +
       (state.scanSettings.ignoredFolders.length === 0
         ? '<div class="empty-state">No ignored folders yet.</div>'
         : '<div>' + state.scanSettings.ignoredFolders.map(folder =>
@@ -282,24 +281,39 @@ const render = {
     const scanView = '<div class="settings-body">' +
       '<p class="settings-description">Control how scanning works for large repositories.</p>' +
       '<label class="scan-checkbox-row">' +
-        '<input type="checkbox" id="toggle-gitignore" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
-        'Ignore files listed in .gitignore' +
+        '<span class="scan-toggle-label">Ignore files listed in .gitignore</span>' +
+        '<span class="scan-toggle">' +
+          '<input type="checkbox" id="toggle-gitignore" class="scan-toggle-input" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
+          '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
+        '</span>' +
       '</label>' +
       '<label class="scan-checkbox-row">' +
-        '<input type="checkbox" id="toggle-hidefolders" data-action="toggleHideFolders" ' + (state.scanSettings.hideFolders ? 'checked' : '') + ' />' +
-        'Hide folders' +
+        '<span class="scan-toggle-label">Hide folders</span>' +
+        '<span class="scan-toggle">' +
+          '<input type="checkbox" id="toggle-hidefolders" class="scan-toggle-input" data-action="toggleHideFolders" ' + (state.scanSettings.hideFolders ? 'checked' : '') + ' />' +
+          '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
+        '</span>' +
       '</label>' +
       '<label class="scan-checkbox-row">' +
-        '<input type="checkbox" id="toggle-hidefolders-searching" data-action="toggleHideFoldersWhileSearching" ' + (state.scanSettings.hideFoldersWhileSearching ? 'checked' : '') + ' />' +
-        'Hide folders when searching' +
+        '<span class="scan-toggle-label">Hide folders when searching</span>' +
+        '<span class="scan-toggle">' +
+          '<input type="checkbox" id="toggle-hidefolders-searching" class="scan-toggle-input" data-action="toggleHideFoldersWhileSearching" ' + (state.scanSettings.hideFoldersWhileSearching ? 'checked' : '') + ' />' +
+          '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
+        '</span>' +
       '</label>' +
       '<label class="scan-checkbox-row">' +
-        '<input type="checkbox" id="toggle-expand-folders" data-action="toggleExpandFoldersOnToggle" ' + (state.scanSettings.expandFoldersOnToggle ? 'checked' : '') + ' />' +
-        'Expand all nested folders on toggle' +
+        '<span class="scan-toggle-label">Expand all nested folders on toggle</span>' +
+        '<span class="scan-toggle">' +
+          '<input type="checkbox" id="toggle-expand-folders" class="scan-toggle-input" data-action="toggleExpandFoldersOnToggle" ' + (state.scanSettings.expandFoldersOnToggle ? 'checked' : '') + ' />' +
+          '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
+        '</span>' +
       '</label>' +
       '<label class="scan-checkbox-row">' +
-        '<input type="checkbox" id="toggle-show-line-count" data-action="toggleShowLineCount" ' + (state.scanSettings.showLineCount !== false ? 'checked' : '') + ' />' +
-        'Show line count on alerts' +
+        '<span class="scan-toggle-label">Show line count on alerts</span>' +
+        '<span class="scan-toggle">' +
+          '<input type="checkbox" id="toggle-show-line-count" class="scan-toggle-input" data-action="toggleShowLineCount" ' + (state.scanSettings.showLineCount !== false ? 'checked' : '') + ' />' +
+          '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
+        '</span>' +
       '</label>' +
       '<label class="scan-field-label">Limit display mode</label>' +
       '<div class="dropdown-container custom-dropdown" data-id="limit-display-mode">' +

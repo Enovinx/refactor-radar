@@ -1,4 +1,8 @@
-declare const acquireVsCodeApi: () => { postMessage: (msg: unknown) => void };
+declare const acquireVsCodeApi: () => {
+  postMessage: (msg: unknown) => void;
+  getState?: () => unknown;
+  setState?: (state: unknown) => void;
+};
 
 'use strict';
 
@@ -107,10 +111,17 @@ if (initialState) {
   state = initialState;
 }
 
+const persistedState = typeof vscode.getState === 'function' ? (vscode.getState() as { configsSubTab?: string }) : null;
+const persistedConfigsSubTab = persistedState?.configsSubTab;
+const defaultConfigsSubTab =
+  persistedConfigsSubTab === 'language' || persistedConfigsSubTab === 'ignore' || persistedConfigsSubTab === 'scan'
+    ? persistedConfigsSubTab
+    : 'scan';
+
 const state2 = {
   collapsed: { files: false, settings: false },
   activeTab: 'alerts' as 'alerts' | 'configs' | 'prompts',
-  configsSubTab: 'language' as 'language' | 'ignore' | 'scan',
+  configsSubTab: defaultConfigsSubTab as 'language' | 'ignore' | 'scan',
   alertsSearch: '',
   alertsSort: 'overageDesc' as 'overageDesc' | 'overageAsc',
   ignoredSearch: '',
@@ -132,6 +143,17 @@ let loadingProgressTimer: number | undefined;
 let loadingPuzzle = createLoadingPuzzle();
 
 const emit = (msg: Msg) => vscode.postMessage(msg);
+
+function persistConfigsSubTab(tab: 'language' | 'ignore' | 'scan') {
+  if (typeof vscode.setState !== 'function') {
+    return;
+  }
+  const currentState = typeof vscode.getState === 'function' ? (vscode.getState() as Record<string, unknown> | null) : null;
+  vscode.setState({
+    ...(currentState || {}),
+    configsSubTab: tab
+  });
+}
 
 function normalizeRelativePath(value: string): string {
   return value
@@ -334,14 +356,20 @@ const actions = {
     const extension = '.' + ext;
     upsertPredictedCustomConfig(extension, lines);
     state2.configsSubTab = 'language';
+    persistConfigsSubTab(state2.configsSubTab);
     renderRoot();
 
     emit({ type: 'addCustom', extension, lines });
   },
   switchTab: (tab: 'alerts' | 'configs' | 'prompts') => { state2.activeTab = tab; renderRoot(); },
-  switchConfigTab: (tab: 'language' | 'ignore' | 'scan') => { state2.configsSubTab = tab; renderRoot(); },
+  switchConfigTab: (tab: 'language' | 'ignore' | 'scan') => {
+    state2.configsSubTab = tab;
+    persistConfigsSubTab(tab);
+    renderRoot();
+  },
   updateConfigsSection: (value: string) => {
     state2.configsSubTab = value === 'ignore' || value === 'scan' ? value : 'language';
+    persistConfigsSubTab(state2.configsSubTab);
     renderRoot();
   },
   toggleSection: (name: 'files' | 'settings') => { state2.collapsed[name] = !state2.collapsed[name]; renderRoot(); },

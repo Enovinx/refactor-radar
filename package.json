@@ -23,6 +23,7 @@
     "maintainability"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onView:refactorRadar.panel",
     "onCommand:refactorRadar.refresh",
     "onCommand:refactorRadar.copyPromptForFile"

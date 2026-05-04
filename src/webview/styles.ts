@@ -650,14 +650,59 @@ export const WEBVIEW_STYLES = String.raw`
     .scan-checkbox-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 10px;
       margin-bottom: 10px;
       font-size: 11px;
     }
-    input[type="checkbox"] {
-      accent-color: var(--vscode-button-background);
+    .scan-toggle-label {
+      flex: 1;
+      color: var(--vscode-foreground);
+    }
+    .scan-toggle {
+      position: relative;
+      width: 34px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .scan-toggle-input {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .scan-toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: color-mix(in srgb, var(--vscode-foreground) 20%, transparent);
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+    .scan-toggle-slider::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
       width: 14px;
       height: 14px;
+      border-radius: 999px;
+      background: var(--vscode-editor-background);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+    .scan-toggle-input:checked + .scan-toggle-slider {
+      background: var(--vscode-button-background);
+    }
+    .scan-toggle-input:checked + .scan-toggle-slider::after {
+      transform: translateX(16px);
+      background: var(--vscode-button-foreground);
+    }
+    .scan-toggle-input:focus-visible + .scan-toggle-slider {
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: 2px;
     }
     .scan-field-label {
       display: block;

@@ -8,6 +8,11 @@ export function activate(context: vscode.ExtensionContext) {
   const tracker = new FileTracker(context, () => sidebar.refresh());
   const sidebar = new SidebarProvider(tracker);
 
+  // Warm the tracker on startup so data is ready before the view opens.
+  void tracker.getOverThresholdFiles(false).catch(err => {
+    console.error('Refactor Radar: warm scan failed', err);
+  });
+
   // ── Register sidebar view ─────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('refactorRadar.panel', sidebar, {

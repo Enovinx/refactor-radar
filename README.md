@@ -36,16 +36,7 @@ To install the extension from source, follow these steps:
 4. Launch and Test:
    * Open the project in VS Code.
    * Press F5 to launch the Extension Development Host.
-
-## Settings
-
-The extension can be configured through VS Code settings:
-
-| Setting | Default | Description |
-|---|---|---|
-| refactorRadar.defaultThreshold | 300 | Default line threshold for file types. |
-| refactorRadar.refreshIntervalMs | 5000 | Minimum time between scans in milliseconds. |
-
+   
 ## Usage
 
 1. Open a code file in VS Code.
