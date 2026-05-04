@@ -51,6 +51,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  hasView(): boolean {
+    return Boolean(this.view);
+  }
+
   setBadgeCount(alertCount: number) {
     this.updateBadge(alertCount);
   }

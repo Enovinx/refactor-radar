@@ -9,28 +9,26 @@ export function activate(context: vscode.ExtensionContext) {
   const sidebar = new SidebarProvider(tracker);
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = 'workbench.view.extension.refactorRadar';
-  statusBar.text = 'Refactor Radar';
-  statusBar.tooltip = 'Refactor Radar alerts';
-  statusBar.hide();
+  statusBar.text = '$(alert) Refactor Radar: 0';
+  statusBar.tooltip = 'No refactor alerts';
+  statusBar.show();
   context.subscriptions.push(statusBar);
 
   const updateStatusBar = (count: number) => {
-    if (count > 0) {
-      statusBar.text = `Refactor Radar: ${count}`;
-      statusBar.tooltip = `${count} file${count === 1 ? '' : 's'} over threshold`;
-      statusBar.show();
-    } else {
-      statusBar.text = 'Refactor Radar';
-      statusBar.tooltip = 'No refactor alerts';
-      statusBar.hide();
-    }
+    statusBar.text = `$(alert) Refactor Radar: ${Math.max(0, count)}`;
+    statusBar.tooltip = count > 0
+      ? `${count} file${count === 1 ? '' : 's'} over threshold`
+      : 'No refactor alerts';
+    statusBar.show();
   };
 
   const updateIndicators = async (force = false) => {
     try {
       const files = await tracker.getOverThresholdFiles(force);
       const count = files.length;
-      sidebar.setBadgeCount(count);
+      if (sidebar.hasView()) {
+        sidebar.setBadgeCount(count);
+      }
       updateStatusBar(count);
     } catch (err) {
       console.error('Refactor Radar: background update failed', err);
