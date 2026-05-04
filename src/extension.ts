@@ -2,11 +2,19 @@ import * as vscode from 'vscode';
 import { FileTracker } from './fileTracker';
 import { SidebarProvider } from './sidebarProvider';
 import { buildRefactorPrompt } from './promptBuilder';
+import { BadgeTreeViewProvider } from './badgeTreeView';
 
 export function activate(context: vscode.ExtensionContext) {
   // ── Core services ─────────────────────────────────────────────────────────
+  let sidebar: SidebarProvider;
   const tracker = new FileTracker(context, () => sidebar.refresh());
-  const sidebar = new SidebarProvider(tracker);
+  sidebar = new SidebarProvider(tracker);
+  const badgeTreeProvider = new BadgeTreeViewProvider();
+  const badgeTreeView = vscode.window.createTreeView('refactorRadar.badge', {
+    treeDataProvider: badgeTreeProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(badgeTreeView);
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = 'workbench.view.extension.refactorRadar';
   statusBar.text = '$(alert) Refactor Radar: 0';
@@ -26,9 +34,10 @@ export function activate(context: vscode.ExtensionContext) {
     try {
       const files = await tracker.getOverThresholdFiles(force);
       const count = files.length;
-      if (sidebar.hasView()) {
-        sidebar.setBadgeCount(count);
-      }
+      sidebar.setBadgeCount(count);
+      badgeTreeView.badge = count > 0
+        ? { value: count, tooltip: `${count} refactor alert${count === 1 ? '' : 's'}` }
+        : undefined;
       updateStatusBar(count);
     } catch (err) {
       console.error('Refactor Radar: background update failed', err);

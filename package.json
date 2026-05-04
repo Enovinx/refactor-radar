@@ -42,6 +42,12 @@
     "views": {
       "refactorRadar": [
         {
+          "type": "tree",
+          "id": "refactorRadar.badge",
+          "name": "",
+          "visibility": "hidden"
+        },
+        {
           "type": "webview",
           "id": "refactorRadar.panel",
           "icon": "media/icon.svg",

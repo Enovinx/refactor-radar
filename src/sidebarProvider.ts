@@ -16,6 +16,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private refreshDebounce?: ReturnType<typeof setTimeout>;
   private statePushId = 0;
+  private lastBadgeCount = 0;
   private buildInFlight?: Promise<{
     files: any[];
     ignoredFiles: any[];
@@ -38,6 +39,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   ) {
    // console.log("Sidebar view resolved (src)");
     this.view = webviewView;
+    this.updateBadge(this.lastBadgeCount);
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -74,8 +76,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
        return; 
     }
 
-    // Avoid stale Activity Bar badges while a new scan is in flight.
-    this.updateBadge(0);
+    // Keep the last known badge visible while the webview initializes.
+    this.updateBadge(this.lastBadgeCount);
 
     const script = fs.readFileSync(path.join(__dirname, 'webview-script.js'), 'utf-8');
     this.view.webview.html = getWebviewContent({
@@ -140,25 +142,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private updateBadge(alertCount: number) {
-    if (!this.view) { return; }
     const normalizedCount = Number.isFinite(alertCount) && alertCount > 0
       ? Math.floor(alertCount)
       : 0;
 
-    if (normalizedCount === 0) {
-      // Some VS Code builds can keep showing a stale badge when clearing directly.
-      // Toggling through zero first reliably removes it.
-      if (this.view.badge) {
-        this.view.badge = { value: 0, tooltip: 'No refactor alerts' };
-      }
-      this.view.badge = undefined;
-      return;
-    }
+    this.lastBadgeCount = normalizedCount;
 
-    this.view.badge = {
-      value: normalizedCount,
-      tooltip: `${normalizedCount} refactor alert${normalizedCount === 1 ? '' : 's'}`,
-    };
+    if (!this.view) { return; }
+    this.view.badge = undefined;
   }
 
   private async buildState(forceRefresh = false) {
