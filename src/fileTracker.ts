@@ -49,6 +49,7 @@ export class FileTracker {
   private fileCacheByIdentity: Map<string, FileCacheEntry>;
   private lastScanAt = 0;
   private lastScanResults: TrackedFile[] = [];
+  private scanInFlight?: Promise<TrackedFile[]>;
   private readonly ignoreService: FileTrackerIgnoreService;
   private readonly scanService: FileTrackerScanService;
 
@@ -308,10 +309,18 @@ export class FileTracker {
   }
 
   async getOverThresholdFiles(force = false): Promise<TrackedFile[]> {
-    const scan = await this.scanService.getOverThresholdFiles(this.lastScanAt, this.lastScanResults, force);
-    this.lastScanAt = scan.lastScanAt;
-    this.lastScanResults = scan.lastScanResults;
-    return scan.results;
+    if (!this.scanInFlight) {
+      this.scanInFlight = (async () => {
+        const scan = await this.scanService.getOverThresholdFiles(this.lastScanAt, this.lastScanResults, force);
+        this.lastScanAt = scan.lastScanAt;
+        this.lastScanResults = scan.lastScanResults;
+        return scan.results;
+      })().finally(() => {
+        this.scanInFlight = undefined;
+      });
+    }
+
+    return this.scanInFlight;
   }
 
   async getDocumentByPath(filePath: string): Promise<vscode.TextDocument | undefined> {

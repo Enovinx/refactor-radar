@@ -80,10 +80,6 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Ensure the extension activates when the view is opened.
-  // (Without an activationEvent, the sidebar provider may never be registered.)
-  console.log('Refactor Radar: activated');
-
   // ── Refresh command ───────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('refactorRadar.refresh', () => {
@@ -121,14 +117,6 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Refresh panel on file events ──────────────────────────────────────────
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(() => {
-      void updateIndicators(false);
-      sidebar.refresh();
-    }),
-    vscode.workspace.onDidOpenTextDocument(() => {
-      void updateIndicators(false);
-      sidebar.refresh();
-    }),
-    vscode.workspace.onDidCloseTextDocument(() => {
       void updateIndicators(false);
       sidebar.refresh();
     }),
