@@ -346,7 +346,12 @@ export class FileTrackerScanService {
       if (baseDir) {
         const scopedPatterns = normalized.includes('/')
           ? [`${baseDir}${normalized}`]
-          : [`${baseDir}${normalized}`, `${baseDir}**/${normalized}`];
+          : [
+              `${baseDir}${normalized}`,
+              `${baseDir}${normalized}/**`,
+              `${baseDir}**/${normalized}`,
+              `${baseDir}**/${normalized}/**`,
+            ];
         for (const scopedPattern of scopedPatterns) {
           patterns.push({ negated, regex: globToRegExp(scopedPattern) });
         }
@@ -355,7 +360,12 @@ export class FileTrackerScanService {
 
       const scopedPatterns = normalized.includes('/')
         ? [normalized]
-        : [normalized, `**/${normalized}`];
+        : [
+            normalized,
+            `${normalized}/**`,
+            `**/${normalized}`,
+            `**/${normalized}/**`,
+          ];
       for (const scopedPattern of scopedPatterns) {
         patterns.push({ negated, regex: globToRegExp(scopedPattern) });
       }
