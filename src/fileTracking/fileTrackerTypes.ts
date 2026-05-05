@@ -43,6 +43,7 @@ export interface FileCacheEntry {
 export interface ScanSettings {
   ignoreGitIgnore: boolean;
   maxFilesToScan: number | null;
+  maxScanDepth: number | null;
   ignoredFolders: string[];
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;

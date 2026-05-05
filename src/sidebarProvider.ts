@@ -106,6 +106,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (!this.view) { return; }
     const pushId = ++this.statePushId;
 
+    this.view.webview.postMessage({ type: 'setLoading', isLoading: true });
+
     if (forceRebuild) {
       this.buildInFlight = undefined;
     }
@@ -318,6 +320,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'updateMaxFilesToScan': {
           const parsed = Number(msg.maxFilesToScan);
           this.tracker.updateMaxFilesToScan(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+          void this.pushState(true);
+          break;
+        }
+
+        case 'updateMaxScanDepth': {
+          const parsed = Number(msg.maxScanDepth);
+          this.tracker.updateMaxScanDepth(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
           void this.pushState(true);
           break;
         }

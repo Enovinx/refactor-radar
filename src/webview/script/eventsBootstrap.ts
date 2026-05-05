@@ -204,6 +204,10 @@ function onChange(e: Event) {
     actions.updateMaxFilesToScan(target.value);
     return;
   }
+  if (target instanceof HTMLInputElement && target.id === 'max-scan-depth') {
+    actions.updateMaxScanDepth(target.value);
+    return;
+  }
   if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
     return;
   }
@@ -251,6 +255,13 @@ window.addEventListener('beforeunload', () => {
 });
 
 window.addEventListener('message', (e: MessageEvent) => {
+  if (e.data.type === 'setLoading') {
+    const isLoading = Boolean(e.data.isLoading);
+    if (state.isLoading !== isLoading) {
+      state.isLoading = isLoading;
+      renderRoot();
+    }
+  }
   if (e.data.type === 'updateState') {
     state = e.data.state as WebviewState;
     if (!state.isLoading) {

@@ -15,6 +15,7 @@ export interface WebviewState {
   scanSettings: {
     ignoreGitIgnore: boolean;
     maxFilesToScan: number | null;
+    maxScanDepth: number | null;
     ignoredFolders: string[];
   };
   isLoading: boolean;

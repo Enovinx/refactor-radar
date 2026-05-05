@@ -68,6 +68,7 @@ interface IgnoredFile {
 interface ScanSettings {
   ignoreGitIgnore: boolean;
   maxFilesToScan: number | null;
+  maxScanDepth: number | null;
   ignoredFolders: string[];
   hideFolders: boolean;
   hideFoldersWhileSearching: boolean;
@@ -88,6 +89,7 @@ let state: WebviewState = {
   scanSettings: {
     ignoreGitIgnore: true,
     maxFilesToScan: null,
+    maxScanDepth: null,
     ignoredFolders: [],
     hideFolders: false,
     hideFoldersWhileSearching: true,
@@ -421,6 +423,13 @@ const actions = {
     state.scanSettings.maxFilesToScan = maxFilesToScan;
     renderRoot();
     emit({ type: 'updateMaxFilesToScan', maxFilesToScan });
+  },
+  updateMaxScanDepth: (value: string) => {
+    const parsed = parseInt(value, 10);
+    const maxScanDepth = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    state.scanSettings.maxScanDepth = maxScanDepth;
+    renderRoot();
+    emit({ type: 'updateMaxScanDepth', maxScanDepth });
   },
   updateHideFolders: (enabled: boolean) => {
     state.scanSettings.hideFolders = enabled;

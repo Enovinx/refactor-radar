@@ -43,6 +43,22 @@ export const WEBVIEW_STYLES = String.raw`
       margin-left: auto;
       margin-right: 4px;
     }
+    .section-header .badge.badge-loading {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 16px;
+      padding: 0;
+    }
+    .section-header .badge-spinner {
+      width: 10px;
+      height: 10px;
+      border: 2px solid color-mix(in srgb, var(--vscode-badge-foreground) 35%, transparent);
+      border-top-color: var(--vscode-badge-foreground);
+      border-radius: 50%;
+      animation: badge-spin 0.8s linear infinite;
+    }
 
     .section-body { overflow: visible; }
     .section-body.collapsed { display: none; }
@@ -486,6 +502,10 @@ export const WEBVIEW_STYLES = String.raw`
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes badge-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .settings-body {
       padding: 8px 12px 10px;
     }
@@ -658,6 +678,11 @@ export const WEBVIEW_STYLES = String.raw`
     .scan-toggle-label {
       flex: 1;
       color: var(--vscode-foreground);
+    }
+    .scan-toggle-note {
+      flex: 1;
+      color: var(--vscode-descriptionForeground);
+      font-size: 10px;
     }
     .scan-toggle {
       position: relative;

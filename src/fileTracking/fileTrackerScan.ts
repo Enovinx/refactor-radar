@@ -40,15 +40,16 @@ export class FileTrackerScanService {
     const includes = this.getScanGlobPatterns();
     const exclude = this.getScanExcludeGlob();
     const gitIgnorePatterns = scanSettings.ignoreGitIgnore
-      ? await this.getGitIgnoreMatchers(root)
+      ? await this.getIgnoreMatchers(root, '.gitignore')
       : [];
+    const rrIgnorePatterns = await this.getIgnoreMatchers(root, '.rrignore');
 
     const allFiles: vscode.Uri[] = [];
     for (const include of includes) {
-      const pattern = new vscode.RelativePattern(root, include);
-      const uris = await vscode.workspace.findFiles(pattern, exclude);
-      allFiles.push(...uris);
-    }
+        const pattern = new vscode.RelativePattern(root, include);
+        const uris = await vscode.workspace.findFiles(pattern, exclude);
+        allFiles.push(...uris);
+      }
 
     const seenUriStrings = new Set<string>();
     const uniqueFiles = allFiles.filter(uri => {
@@ -61,6 +62,7 @@ export class FileTrackerScanService {
     });
 
     const maxFiles = scanSettings.maxFilesToScan ?? Number.POSITIVE_INFINITY;
+    const maxDepth = scanSettings.maxScanDepth ?? Number.POSITIVE_INFINITY;
     let scannedCount = 0;
     const ignoredFolderSet = new Set(scanSettings.ignoredFolders.map(folder => normalizeFolderPath(folder)));
     const seenPaths = new Set<string>();
@@ -74,10 +76,16 @@ export class FileTrackerScanService {
       if (!relativePath) {
         continue;
       }
+      if (this.getRelativeDepth(relativePath) > maxDepth) {
+        continue;
+      }
       if (Array.from(ignoredFolderSet).some(folder => relativePath === folder || relativePath.startsWith(`${folder}/`))) {
         continue;
       }
       if (gitIgnorePatterns.length > 0 && this.isIgnoredByPatterns(relativePath, gitIgnorePatterns)) {
+        continue;
+      }
+      if (rrIgnorePatterns.length > 0 && this.isIgnoredByPatterns(relativePath, rrIgnorePatterns)) {
         continue;
       }
 
@@ -199,40 +207,61 @@ export class FileTrackerScanService {
     };
   }
 
-  private async getGitIgnoreMatchers(root: vscode.WorkspaceFolder): Promise<Array<{ negated: boolean; regex: RegExp }>> {
-    const filePath = path.join(root.uri.fsPath, '.gitignore');
+  private async getIgnoreMatchers(
+    root: vscode.WorkspaceFolder,
+    fileName: '.gitignore' | '.rrignore'
+  ): Promise<Array<{ negated: boolean; regex: RegExp }>> {
+    const filePath = path.join(root.uri.fsPath, fileName);
     try {
       const content = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
-      const lines = Buffer.from(content).toString('utf8').split(/\r?\n/);
-      const patterns: Array<{ negated: boolean; regex: RegExp }> = [];
-
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith('#')) {
-          continue;
-        }
-        const negated = line.startsWith('!');
-        const working = negated ? line.slice(1) : line;
-        if (!working) {
-          continue;
-        }
-
-        if (working.endsWith('/')) {
-          const base = normalizeFolderPath(working);
-          const regex = globToRegExp(`**/${base}/**`);
-          patterns.push({ negated, regex });
-          continue;
-        }
-
-        const normalized = normalizeFolderPath(working);
-        const scopedPattern = normalized.includes('/') ? normalized : `**/${normalized}`;
-        patterns.push({ negated, regex: globToRegExp(scopedPattern) });
-      }
-
-      return patterns;
+      return this.parseIgnoreFile(root, path.dirname(filePath), content);
     } catch {
       return [];
     }
+  }
+
+  private parseIgnoreFile(
+    root: vscode.WorkspaceFolder,
+    fileDir: string,
+    content: Uint8Array
+  ): Array<{ negated: boolean; regex: RegExp }> {
+    const lines = Buffer.from(content).toString('utf8').split(/\r?\n/);
+    const patterns: Array<{ negated: boolean; regex: RegExp }> = [];
+    const relativeDir = normalizeFolderPath(path.relative(root.uri.fsPath, fileDir));
+    const baseDir = relativeDir ? `${relativeDir}/` : '';
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) {
+        continue;
+      }
+      const negated = line.startsWith('!');
+      const working = negated ? line.slice(1) : line;
+      if (!working) {
+        continue;
+      }
+
+      if (working.endsWith('/')) {
+        const base = normalizeFolderPath(working);
+        const scoped = baseDir ? `${baseDir}${base}/**` : `**/${base}/**`;
+        patterns.push({ negated, regex: globToRegExp(scoped) });
+        continue;
+      }
+
+      const normalized = normalizeFolderPath(working);
+      if (baseDir) {
+        const scopedPattern = normalized.includes('/')
+          ? `${baseDir}${normalized}`
+          : `${baseDir}**/${normalized}`;
+        patterns.push({ negated, regex: globToRegExp(scopedPattern) });
+        continue;
+      }
+
+      const scopedPattern = normalized.includes('/') ? normalized : `**/${normalized}`;
+      patterns.push({ negated, regex: globToRegExp(scopedPattern) });
+    }
+
+    return patterns;
   }
 
   private isIgnoredByPatterns(relativePath: string, patterns: Array<{ negated: boolean; regex: RegExp }>): boolean {
@@ -277,7 +306,14 @@ export class FileTrackerScanService {
     return Array.from(exts).map(ext => `**/*${ext}`);
   }
 
-  private getScanExcludeGlob(): string {
-    return '**/{node_modules,out,dist,build,coverage,.git,.vscode-test}/**';
+  private getScanExcludeGlob(): string | undefined {
+    return undefined;
+  }
+
+  private getRelativeDepth(relativePath: string): number {
+    if (!relativePath) {
+      return 0;
+    }
+    return relativePath.split('/').filter(Boolean).length;
   }
 }

@@ -37,6 +37,7 @@ export class FileTracker {
   private scanSettings: ScanSettings = {
     ignoreGitIgnore: true,
     maxFilesToScan: null,
+    maxScanDepth: null,
     ignoredFolders: [],
     hideFolders: false,
     hideFoldersWhileSearching: true,
@@ -141,6 +142,12 @@ export class FileTracker {
 
   updateMaxFilesToScan(value: number | null): void {
     this.scanSettings.maxFilesToScan = value && value > 0 ? Math.floor(value) : null;
+    saveScanSettings(this.context, this.scanSettings);
+    this.onChange();
+  }
+
+  updateMaxScanDepth(value: number | null): void {
+    this.scanSettings.maxScanDepth = value && value > 0 ? Math.floor(value) : null;
     saveScanSettings(this.context, this.scanSettings);
     this.onChange();
   }

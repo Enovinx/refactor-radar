@@ -34,11 +34,24 @@ export function saveBatchPromptTemplate(context: vscode.ExtensionContext, templa
 
 export function loadScanSettings(context: vscode.ExtensionContext): ScanSettings {
   const saved = context.workspaceState.get<Partial<ScanSettings>>('scanSettings', {});
+  const migrated = context.workspaceState.get<boolean>('ignoreGitIgnoreMigrated', false);
+  const shouldForceEnable = saved.ignoreGitIgnore === false && !migrated;
+  if (shouldForceEnable) {
+    void context.workspaceState.update('scanSettings', {
+      ...saved,
+      ignoreGitIgnore: true,
+    });
+    void context.workspaceState.update('ignoreGitIgnoreMigrated', true);
+  }
   return {
-    ignoreGitIgnore: saved.ignoreGitIgnore ?? true,
+    ignoreGitIgnore: shouldForceEnable ? true : (saved.ignoreGitIgnore ?? true),
     maxFilesToScan:
       typeof saved.maxFilesToScan === 'number' && saved.maxFilesToScan > 0
         ? Math.floor(saved.maxFilesToScan)
+        : null,
+    maxScanDepth:
+      typeof saved.maxScanDepth === 'number' && saved.maxScanDepth > 0
+        ? Math.floor(saved.maxScanDepth)
         : null,
     ignoredFolders: Array.isArray(saved.ignoredFolders)
       ? saved.ignoredFolders.filter(Boolean).map(folder => normalizeFolderPath(folder))

@@ -203,9 +203,13 @@ const render = {
           })),
         ].sort(render.sortTreeEntries).map(entry => entry.render()).join('');
 
+    const badgeMarkup = state.isLoading
+      ? '<span class="badge badge-loading"><span class="badge-spinner" aria-hidden="true"></span></span>'
+      : (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '');
+
     const filesSection = '<div class="section-header" data-action="toggleSection" data-section="files">' +
       '<span>Files Over Threshold</span>' +
-      (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '') +
+      badgeMarkup +
       '<span class="chevron ' + (collapsed.files ? 'collapsed' : '') + '">▾</span>' +
     '</div>' +
     '<div class="section-body ' + (collapsed.files ? 'collapsed' : '') + '">' +
@@ -282,6 +286,7 @@ const render = {
       '<p class="settings-description">Control how scanning works for large repositories.</p>' +
       '<label class="scan-checkbox-row">' +
         '<span class="scan-toggle-label">Ignore files listed in .gitignore</span>' +
+        '<span class="scan-toggle-note">.rrignore is always applied.</span>' +
         '<span class="scan-toggle">' +
           '<input type="checkbox" id="toggle-gitignore" class="scan-toggle-input" data-action="toggleGitIgnore" ' + (state.scanSettings.ignoreGitIgnore ? 'checked' : '') + ' />' +
           '<span class="scan-toggle-slider" aria-hidden="true"></span>' +
@@ -329,6 +334,8 @@ const render = {
       '</div>' +
       '<label class="scan-field-label" style="margin-top: 12px;">Max files to scan (blank = unlimited)</label>' +
       '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
+      '<label class="scan-field-label" style="margin-top: 12px;">Max scan depth (blank = unlimited)</label>' +
+      '<input type="number" id="max-scan-depth" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxScanDepth ?? '') + '" class="scan-input" />' +
     '</div>';
 
     let activeConfigView = '';
