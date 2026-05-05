@@ -1,6 +1,10 @@
 # Refactor Radar
 
-<img src="promo/promoimage.png" width="45%" /> <img src="promo/promoimage2.png" width="45%" />
+<div align="center">
+  <img src="promo/promoimage.png" width="32%" />
+  <img src="promo/promoimage2.png" width="32%" />
+  <img src="promo/promoimage3.png" width="32%" />
+</div>
 Refactor Radar is a VS Code extension that monitors file lengths and provides structured AI prompts to assist with refactoring large files. It helps maintain code quality by alerting you when files exceed defined thresholds and simplifying the process of preparing code for AI analysis.
 
 ## Features
