@@ -7,6 +7,7 @@
   "engines": {
     "vscode": "^1.116.0"
   },
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/enovinx/refactor-radar"
@@ -35,7 +36,7 @@
         {
           "id": "refactorRadar",
           "title": "Refactor Radar",
-          "icon": "images/icon.png"
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -50,14 +51,11 @@
         {
           "type": "webview",
           "id": "refactorRadar.panel",
-          "icon": "images/icon.png",
+          "icon": "media/icon.svg",
           "name": "Home"
         }
       ]
     },
-    "icon": [
-      "images/icon.png"
-    ],
     "commands": [
       {
         "command": "refactorRadar.refresh",

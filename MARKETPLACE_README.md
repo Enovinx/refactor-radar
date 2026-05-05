@@ -2,6 +2,12 @@
 
 Monitor file lengths and generate AI refactor prompts without leaving VS Code.
 
+<div align="center">
+  <img src="promo/promoimage.png" width="32%" />
+  <img src="promo/promoimage2.png" width="32%" />
+  <img src="promo/promoimage3.png" width="32%" />
+</div>
+
 ## Features
 
 - **Status bar line count** - see your current file size at a glance
