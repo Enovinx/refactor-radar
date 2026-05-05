@@ -43,7 +43,9 @@ interface WebviewState {
   configs: LanguageConfig[];
   scanSettings: ScanSettings;
   workspaceRoot: string | null;
+  refreshIntervalMs: number;
   isLoading: boolean;
+  isRefreshing?: boolean;
   loadingProgress: number;
   promptTemplate: string;
   promptVariables: string[];
@@ -98,7 +100,9 @@ let state: WebviewState = {
     limitDisplayMode: 'customOnly',
   },
   workspaceRoot: null,
+  refreshIntervalMs: 5000,
   isLoading: true,
+  isRefreshing: false,
   loadingProgress: 0,
   promptTemplate: '',
   promptVariables: [],
@@ -452,8 +456,14 @@ const actions = {
     renderRoot();
   },
   updateLimitDisplayMode: (mode: 'customOnly' | 'off' | 'always') => {
-    vscode.postMessage({ type: 'updateLimitDisplayMode', mode });
     state.scanSettings.limitDisplayMode = mode;
+    vscode.postMessage({ type: 'updateLimitDisplayMode', mode });
+    renderRoot();
+  },
+
+  updateRefreshIntervalMs: (interval: number) => {
+    state.refreshIntervalMs = interval;
+    vscode.postMessage({ type: 'updateRefreshIntervalMs', interval });
     renderRoot();
   },
   addIgnoredFolder: () => {

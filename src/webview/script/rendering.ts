@@ -203,7 +203,7 @@ const render = {
           })),
         ].sort(render.sortTreeEntries).map(entry => entry.render()).join('');
 
-    const badgeMarkup = state.isLoading
+    const badgeMarkup = (state.isLoading || state.isRefreshing)
       ? '<span class="badge badge-loading"><span class="badge-spinner" aria-hidden="true"></span></span>'
       : (files.length > 0 ? '<span class="badge">' + files.length + '</span>' : '');
 
@@ -336,6 +336,8 @@ const render = {
       '<input type="number" id="max-files-to-scan" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxFilesToScan ?? '') + '" class="scan-input" />' +
       '<label class="scan-field-label" style="margin-top: 12px;">Max scan depth (blank = unlimited)</label>' +
       '<input type="number" id="max-scan-depth" min="1" placeholder="Unlimited" value="' + (state.scanSettings.maxScanDepth ?? '') + '" class="scan-input" />' +
+      '<label class="scan-field-label" style="margin-top: 12px;">Refresh interval (ms, min 1000)</label>' +
+      '<input type="number" id="refresh-interval" min="1000" step="1000" placeholder="5000" value="' + state.refreshIntervalMs + '" class="scan-input" />' +
     '</div>';
 
     let activeConfigView = '';

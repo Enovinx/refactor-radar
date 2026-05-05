@@ -14,6 +14,7 @@ export interface WebviewState {
   configs: LanguageConfig[];
   scanSettings: ScanSettings;
   workspaceRoot: string | null;
+  refreshIntervalMs: number;
   isLoading: boolean;
   loadingProgress: number;
   promptTemplate: string;

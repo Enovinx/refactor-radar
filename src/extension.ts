@@ -131,6 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('refactorRadar.refreshIntervalMs')) {
         startRefreshTimer();
+        sidebar.refresh();
       }
     }),
   );

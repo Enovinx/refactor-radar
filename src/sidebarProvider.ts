@@ -37,7 +37,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
-   // console.log("Sidebar view resolved (src)");
     this.view = webviewView;
     this.updateBadge(this.lastBadgeCount);
 
@@ -72,8 +71,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private async render() {
     if (!this.view) {
-      console.log("Cancelled");
-       return; 
+      return;
     }
 
     // Keep the last known badge visible while the webview initializes.
@@ -86,6 +84,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       configs: this.tracker.getConfigs(),
       scanSettings: this.tracker.getScanSettings(),
       workspaceRoot: this.tracker.getWorkspaceRoot(),
+      refreshIntervalMs: vscode.workspace.getConfiguration('refactorRadar').get<number>('refreshIntervalMs', 5000),
       isLoading: true,
       loadingProgress: 0,
       promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
@@ -95,9 +94,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       defaultBatchPromptTemplate: DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
       defaultPromptTemplate: DEFAULT_REFACTOR_PROMPT_TEMPLATE,
     }, script);
-    console.log("Webview html set to...");
-    console.log(this.view.webview.html);
-    console.log("Webview coontent type: " + typeof this.view.webview.html);
     // Kick off the initial state push in the background.
     void this.pushState();
   }
@@ -106,20 +102,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (!this.view) { return; }
     const pushId = ++this.statePushId;
 
-    this.view.webview.postMessage({ type: 'setLoading', isLoading: true });
-
     if (forceRebuild) {
+      this.view.webview.postMessage({ type: 'setLoading', isLoading: true });
       this.buildInFlight = undefined;
+    } else {
+      this.view.webview.postMessage({ type: 'setRefreshing', isRefreshing: true });
     }
 
     try {
       const state = await this.buildState(forceRebuild);
       if (!this.view || pushId !== this.statePushId) { return; }
       this.updateBadge(state.files.length);
-      this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false, loadingProgress: 100 } });
-    } catch (err) {
+      this.view.webview.postMessage({ type: 'updateState', state: { ...state, isLoading: false, isRefreshing: false, loadingProgress: 100 } });
+    } catch {
       if (!this.view || pushId !== this.statePushId) { return; }
-      console.error('Refactor Radar: failed to build state', err);
       // Keep the webview usable even if state build fails.
       this.updateBadge(0);
       this.view.webview.postMessage({
@@ -130,7 +126,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           configs: this.tracker.getConfigs(),
           scanSettings: this.tracker.getScanSettings(),
           workspaceRoot: this.tracker.getWorkspaceRoot(),
+          refreshIntervalMs: vscode.workspace.getConfiguration('refactorRadar').get<number>('refreshIntervalMs', 5000),
           isLoading: false,
+          isRefreshing: false,
           loadingProgress: 100,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
@@ -158,7 +156,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // Coalesce concurrent refreshes into a single scan.
     if (!this.buildInFlight) {
       this.buildInFlight = (async () => {
-        console.log("Building state...");
         const [files, configs] = await Promise.all([
           this.tracker.getOverThresholdFiles(forceRefresh),
           Promise.resolve(this.tracker.getConfigs()),
@@ -169,7 +166,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           configs,
           scanSettings: this.tracker.getScanSettings(),
           workspaceRoot: this.tracker.getWorkspaceRoot(),
+          refreshIntervalMs: vscode.workspace.getConfiguration('refactorRadar').get<number>('refreshIntervalMs', 5000),
           isLoading: false,
+          isRefreshing: false,
           promptTemplate: this.tracker.getPromptTemplate() || DEFAULT_REFACTOR_PROMPT_TEMPLATE,
           promptVariables: PROMPT_TEMPLATE_VARIABLES,
           batchPromptTemplate: this.tracker.getBatchPromptTemplate() || DEFAULT_BATCH_REFACTOR_PROMPT_TEMPLATE,
@@ -197,7 +196,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
 
         case 'copyPrompt': {
-          console.log(msg.filePath);
           void (async () => {
             const doc = await this.tracker.getDocumentByPath(msg.filePath);
             if (!doc) {
@@ -359,6 +357,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           if (msg.mode === 'customOnly' || msg.mode === 'off' || msg.mode === 'always') {
             this.tracker.updateLimitDisplayMode(msg.mode);
             void this.pushState(true);
+          }
+          break;
+        }
+
+        case 'updateRefreshIntervalMs': {
+          const parsed = Number(msg.interval);
+          if (Number.isFinite(parsed) && parsed >= 1000) {
+            void vscode.workspace.getConfiguration('refactorRadar').update('refreshIntervalMs', parsed, vscode.ConfigurationTarget.Global);
           }
           break;
         }

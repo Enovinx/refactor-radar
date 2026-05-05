@@ -23,8 +23,6 @@ export class FileTrackerScanService {
     lastScanResults: TrackedFile[],
     force = false
   ): Promise<{ results: TrackedFile[]; lastScanAt: number; lastScanResults: TrackedFile[] }> {
-    const scanStartedAt = Date.now();
-    console.log('[Refactor Radar] scan start');
     const refreshInterval = vscode.workspace.getConfiguration('refactorRadar').get<number>('refreshIntervalMs', 5000);
     const now = Date.now();
     if (!force && lastScanAt > 0 && now - lastScanAt < refreshInterval) {
@@ -43,24 +41,14 @@ export class FileTrackerScanService {
     const scanSettings = this.getScanSettings();
     const trackedExtensions = this.getTrackedExtensions();
     const exclude = this.getScanExcludeGlob();
-    const gitIgnoreStartedAt = Date.now();
-    console.log('[Refactor Radar] phase start: load .gitignore');
     const gitIgnorePatterns = scanSettings.ignoreGitIgnore
       ? await this.getIgnoreMatchers(root, '.gitignore')
       : [];
-    const rrIgnoreStartedAt = Date.now();
-    console.log('[Refactor Radar] phase start: load .rrignore');
     const rrIgnorePatterns = await this.getIgnoreMatchers(root, '.rrignore');
-    const discoveryStartedAt = Date.now();
-    console.log('[Refactor Radar] phase start: discover workspace files');
 
     const uniqueFiles = await vscode.workspace.findFiles(
       new vscode.RelativePattern(root, '**/*'),
       exclude
-    );
-    const discoveryDuration = Date.now() - discoveryStartedAt;
-    console.log(
-      `[Refactor Radar] phase done: discover workspace files duration=${discoveryDuration}ms found=${uniqueFiles.length}`
     );
 
     const maxFiles = scanSettings.maxFilesToScan ?? Number.POSITIVE_INFINITY;
@@ -119,12 +107,6 @@ export class FileTrackerScanService {
       }
 
       scannedCount += 1;
-      if (scannedCount % FileTrackerScanService.PROGRESS_LOG_INTERVAL === 0) {
-        const elapsed = Date.now() - scanStartedAt;
-        console.log(
-          `[Refactor Radar] progress scanned=${scannedCount}/${uniqueFiles.length} alerts=${results.length} elapsed=${elapsed}ms`
-        );
-      }
       let lineCount: number;
       let languageId: string;
       let fileIdentity: string | undefined;
@@ -255,37 +237,6 @@ export class FileTrackerScanService {
     const sortStartedAt = Date.now();
     results.sort((left, right) => right.overage - left.overage);
     const sortMs = Date.now() - sortStartedAt;
-    const totalMs = Date.now() - scanStartedAt;
-
-    console.log(
-      `[Refactor Radar] scan timings total=${totalMs}ms ` +
-      `gitignore=${rrIgnoreStartedAt - gitIgnoreStartedAt}ms ` +
-      `rrignore=${discoveryStartedAt - rrIgnoreStartedAt}ms ` +
-      `discovery=${discoveryDuration}ms ` +
-      `fileProcessing=${fileProcessingMs}ms ` +
-      `stats=${statsMs}ms ` +
-      `openDoc=${documentOpenMs}ms ` +
-      `ignoreResolution=${ignoreResolutionMs}ms ` +
-      `threshold=${thresholdMs}ms ` +
-      `prune=${pruneMs}ms ` +
-      `saveCache=${saveCacheMs}ms ` +
-      `sort=${sortMs}ms ` +
-      `found=${uniqueFiles.length} ` +
-      `scanned=${scannedCount} ` +
-      `alerts=${results.length} ` +
-      `extFiltered=${extensionFilterCount} ` +
-      `depthFiltered=${depthFilterCount} ` +
-      `folderFiltered=${ignoredFolderFilterCount} ` +
-      `gitignored=${gitIgnoreFilterCount} ` +
-      `rrignored=${rrIgnoreFilterCount} ` +
-      `langSkipped=${skippedLanguageCount} ` +
-      `thresholdSkipped=${ignoredThresholdCount} ` +
-      `statMisses=${statMissCount} ` +
-      `openedDocs=${documentsOpenedCount} ` +
-      `cacheIdentityHits=${cacheHitByIdentityCount} ` +
-      `cachePathHits=${cacheHitByPathCount}`
-    );
-
     return {
       results,
       lastScanAt: Date.now(),

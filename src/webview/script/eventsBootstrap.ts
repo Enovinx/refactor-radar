@@ -208,6 +208,13 @@ function onChange(e: Event) {
     actions.updateMaxScanDepth(target.value);
     return;
   }
+  if (target instanceof HTMLInputElement && target.id === 'refresh-interval') {
+    const val = Number(target.value);
+    if (Number.isFinite(val) && val >= 1000) {
+      actions.updateRefreshIntervalMs(val);
+    }
+    return;
+  }
   if (!(target instanceof HTMLInputElement) || target.dataset.action !== 'updateThreshold' || !target.dataset.language) {
     return;
   }
@@ -262,6 +269,12 @@ window.addEventListener('message', (e: MessageEvent) => {
       renderRoot();
     }
   }
+  if (e.data.type === 'setRefreshing') {
+    state.isRefreshing = Boolean(e.data.isRefreshing);
+    renderRoot();
+    return;
+  }
+
   if (e.data.type === 'updateState') {
     state = e.data.state as WebviewState;
     if (!state.isLoading) {
