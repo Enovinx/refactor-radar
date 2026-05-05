@@ -2,7 +2,7 @@
   "name": "refactor-radar",
   "displayName": "Refactor Radar",
   "description": "Track file lengths, get warned when they bloat, and copy AI refactor prompts in one click.",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "publisher": "Enovinx",
   "engines": {
     "vscode": "^1.116.0"
@@ -35,7 +35,7 @@
         {
           "id": "refactorRadar",
           "title": "Refactor Radar",
-          "icon": "media/icon.svg"
+          "icon": "images/icon.png"
         }
       ]
     },
@@ -50,7 +50,7 @@
         {
           "type": "webview",
           "id": "refactorRadar.panel",
-          "icon": "media/icon.svg",
+          "icon": "images/icon.png",
           "name": "Home"
         }
       ]
